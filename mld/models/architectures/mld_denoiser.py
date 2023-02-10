@@ -75,6 +75,11 @@ class MldDenoiser(nn.Module):
                                         self.latent_dim,
                                         guidance_scale=guidance_scale,
                                         guidance_uncodp=guidance_uncondp)
+        elif self.condition is None:
+            self.time_proj = Timesteps(text_encoded_dim, flip_sin_to_cos,
+                                       freq_shift)
+            self.time_embedding = TimestepEmbedding(text_encoded_dim,
+                                                    self.latent_dim)
         else:
             raise TypeError(f"condition type {self.condition} not supported")
 
@@ -175,6 +180,8 @@ class MldDenoiser(nn.Module):
                 emb_latent = action_emb + time_emb
             else:
                 emb_latent = torch.cat((time_emb, action_emb), 0)
+        elif self.condition is None:
+            emb_latent = time_emb
         else:
             raise TypeError(f"condition type {self.condition} not supported")
 

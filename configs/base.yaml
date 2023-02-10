@@ -1,6 +1,6 @@
 # FOLDER: ./experiments
 SEED_VALUE: 1234
-DEBUG: True
+DEBUG: False
 TRAIN:
   SPLIT: 'train'
   NUM_WORKERS: 2 # Number of workers

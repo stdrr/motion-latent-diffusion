@@ -157,7 +157,7 @@ def parse_args(phase="train"):
     # params = {key: val for key, val in vars(opt).items() if val is not None}
 
     # update config from files
-    cfg_base = OmegaConf.load('./configs/base.yaml')
+    cfg_base = OmegaConf.load('/media/odin/stdrr/projects/anomaly_detection/code/motion-latent-diffusion/configs/base.yaml')
     cfg_exp = OmegaConf.merge(cfg_base, OmegaConf.load(params.cfg))
     cfg_model = get_module_config(cfg_exp.model, cfg_exp.model.target)
     cfg_assets = OmegaConf.load(params.cfg_assets)

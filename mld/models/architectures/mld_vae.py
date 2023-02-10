@@ -55,6 +55,7 @@ class MldVae(nn.Module):
         self.arch = arch
         self.mlp_dist = ablation.MLP_DIST
         self.pe_type = ablation.PE_TYPE
+        self.batch_first = ablation.BATCH_FIRST
 
         if self.pe_type == "actor":
             self.query_pos_encoder = PositionalEncoding(
@@ -65,7 +66,7 @@ class MldVae(nn.Module):
             self.query_pos_encoder = build_position_encoding(
                 self.latent_dim, position_embedding=position_embedding)
             self.query_pos_decoder = build_position_encoding(
-                self.latent_dim, position_embedding=position_embedding)
+                self.latent_dim, position_embedding=position_embedding, batch_first=self.batch_first)
         else:
             raise ValueError("Not Support PE type")
 
@@ -124,7 +125,8 @@ class MldVae(nn.Module):
     def encode(
             self,
             features: Tensor,
-            lengths: Optional[List[int]] = None
+            lengths: Optional[List[int]] = None,
+            return_lengths: bool = False
     ) -> Union[Tensor, Distribution]:
         if lengths is None:
             lengths = [len(feature) for feature in features]
@@ -181,6 +183,8 @@ class MldVae(nn.Module):
         std = logvar.exp().pow(0.5)
         dist = torch.distributions.Normal(mu, std)
         latent = dist.rsample()
+        if return_lengths:
+            return latent, dist, lengths
         return latent, dist
 
     def decode(self, z: Tensor, lengths: List[int]):

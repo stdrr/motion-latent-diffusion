@@ -6,7 +6,16 @@ from .HumanML3D import HumanML3DDataModule
 from .Kit import KitDataModule
 from .Humanact12 import Humanact12DataModule
 from .Uestc import UestcDataModule
+from .UBnormal import UBnormal
 from .utils import *
+
+# From COSKAD
+import argparse
+import yaml
+import sys
+sys.path.append('/media/odin/stdrr/projects/anomaly_detection/code/COSKAD/clean_code/HRAD_lightning')
+from utils.argparser import init_sub_args
+from utils.dataset import get_dataset_and_loader
 
 
 def get_mean_std(phase, cfg, dataset_name):
@@ -70,6 +79,7 @@ dataset_module_map = {
     "kit": KitDataModule,
     "humanact12": Humanact12DataModule,
     "uestc": UestcDataModule,
+    'ubnormal': UBnormal
 }
 motion_subdir = {"humanml3d": "new_joint_vecs", "kit": "new_joint_vecs"}
 
@@ -135,6 +145,16 @@ def get_datasets(cfg, logger=None, phase="train"):
         elif dataset_name.lower() in ["amass"]:
             # todo: add amass dataset
             raise NotImplementedError
+
+        # custom dataset
+        elif dataset_name.lower() in ["ubnormal"]:
+            config_path = '/media/odin/stdrr/projects/anomaly_detection/code/COSKAD/clean_code/HRAD_lightning/config/UBnormal/diffusion.yaml'
+            args = yaml.load(open(config_path), Loader=yaml.FullLoader)
+            args = argparse.Namespace(**args)
+            args, dataset_args, _,_,_ = init_sub_args(args)
+
+            dataset = dataset_module_map[dataset_name.lower()](cfg=(args,dataset_args), batch_size=dataset_args.batch_size, num_workers=dataset_args.num_workers)
+            datasets.append(dataset)
         else:
             raise NotImplementedError
     cfg.DATASET.NFEATS = datasets[0].nfeats

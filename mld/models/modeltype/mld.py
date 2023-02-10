@@ -53,7 +53,7 @@ class MLD(BaseModel):
             self.vae_type = cfg.model.motion_vae.target.split(
                 ".")[-1].lower().replace("vae", "")
 
-        self.text_encoder = instantiate_from_config(cfg.model.text_encoder)
+        # self.text_encoder = instantiate_from_config(cfg.model.text_encoder)
 
         if self.vae_type != "no":
             self.vae = instantiate_from_config(cfg.model.motion_vae)
@@ -141,6 +141,8 @@ class MLD(BaseModel):
                 beta=0,
                 glob_rot=None,
                 get_rotations_back=False)
+        elif self.condition is None:
+            self.feats2joints = datamodule.feats2joints
 
     def _get_t2m_evaluator(self, cfg):
         """
@@ -410,11 +412,13 @@ class MLD(BaseModel):
         return n_set
 
     def train_vae_forward(self, batch):
-        feats_ref = batch["motion"]
-        lengths = batch["length"]
+        feats_ref = batch[0].permute(0,2,3,1).contiguous()
+        feats_ref_shape = feats_ref.shape
+        feats_ref = feats_ref.view(*feats_ref_shape[:2], feats_ref_shape[2]*feats_ref_shape[3])
+        lengths = None
 
         if self.vae_type in ["mld", "vposert", "actor"]:
-            motion_z, dist_m = self.vae.encode(feats_ref, lengths)
+            motion_z, dist_m, lengths = self.vae.encode(feats_ref, lengths, return_lengths=True)
             feats_rst = self.vae.decode(motion_z, lengths)
         else:
             raise TypeError("vae_type must be mcross or actor")
@@ -430,6 +434,9 @@ class MLD(BaseModel):
             mask = batch["mask"]
             joints_rst = self.feats2joints(feats_rst, mask)
             joints_ref = self.feats2joints(feats_ref, mask)
+        elif self.condition is None:
+            joints_rst = self.feats2joints(feats_rst)
+            joints_ref = self.feats2joints(feats_ref)
 
         if dist_m is not None:
             if self.is_vae:
@@ -456,8 +463,10 @@ class MLD(BaseModel):
         return rs_set
 
     def train_diffusion_forward(self, batch):
-        feats_ref = batch["motion"]
-        lengths = batch["length"]
+        feats_ref = batch[0].permute(0,2,3,1).contiguous()
+        feats_ref_shape = feats_ref.shape
+        feats_ref = feats_ref.view(*feats_ref_shape[:2], feats_ref_shape[2]*feats_ref_shape[3])
+        lengths = None
         # motion encode
         with torch.no_grad():
             if self.vae_type in ["mld", "vposert", "actor"]:
@@ -480,6 +489,8 @@ class MLD(BaseModel):
             action = batch['action']
             # text encode
             cond_emb = action
+        elif self.condition is None:
+            cond_emb = None
         else:
             raise TypeError(f"condition type {self.condition} not supported")
 
@@ -488,7 +499,7 @@ class MLD(BaseModel):
         return {**n_set}
 
     def test_diffusion_forward(self, batch, finetune_decoder=False):
-        lengths = batch["length"]
+        lengths = None
 
         if self.condition in ["text", "text_uncond"]:
             # get text embeddings
@@ -508,6 +519,8 @@ class MLD(BaseModel):
                     cond_emb,
                     torch.zeros_like(batch['action'],
                                      dtype=batch['action'].dtype))
+        elif self.condition is None:
+            cond_emb = None
         else:
             raise TypeError(f"condition type {self.condition} not supported")
 
@@ -533,8 +546,11 @@ class MLD(BaseModel):
         }
 
         # prepare gt/refer for metric
-        if "motion" in batch.keys() and not finetune_decoder:
-            feats_ref = batch["motion"].detach()
+        if not finetune_decoder:
+            feats_ref = batch[0].permute(0,2,3,1).contiguous()
+            feats_ref_shape = feats_ref.shape
+            feats_ref = feats_ref.view(*feats_ref_shape[:2], feats_ref_shape[2]*feats_ref_shape[3])
+            feats_ref = feats_ref.detach()
             with torch.no_grad():
                 if self.vae_type in ["mld", "vposert"]:
                     motion_z, dist_m = self.vae.encode(feats_ref, lengths)

@@ -14,6 +14,14 @@ from mld.data.get_data import get_datasets
 from mld.models.get_model import get_model
 from mld.utils.logger import create_logger
 
+# From COSKAD
+import argparse
+import yaml
+import sys
+sys.path.append('/media/odin/stdrr/projects/anomaly_detection/code/COSKAD/clean_code/HRAD_lightning')
+from utils.argparser import init_sub_args
+from utils.dataset import get_dataset_and_loader
+
 
 def main():
     # parse options
@@ -83,7 +91,7 @@ def main():
     logger.info(OmegaConf.to_yaml(cfg))
 
     # create dataset
-    datasets = get_datasets(cfg, logger=logger)
+    datasets = get_datasets(cfg)
     logger.info("datasets module {} initialized".format("".join(
         cfg.TRAIN.DATASETS)))
 
