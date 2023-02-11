@@ -14,14 +14,6 @@ from mld.data.get_data import get_datasets
 from mld.models.get_model import get_model
 from mld.utils.logger import create_logger
 
-# From COSKAD
-import argparse
-import yaml
-import sys
-sys.path.append('/media/odin/stdrr/projects/anomaly_detection/code/COSKAD/clean_code/HRAD_lightning')
-from utils.argparser import init_sub_args
-from utils.dataset import get_dataset_and_loader
-
 
 def main():
     # parse options
@@ -72,14 +64,16 @@ def main():
     loggers = []
     if cfg.LOGGER.WANDB.PROJECT:
         wandb_logger = pl_loggers.WandbLogger(
+            entity=cfg.LOGGER.WANDB.ENTITY,
             project=cfg.LOGGER.WANDB.PROJECT,
+            group=cfg.LOGGER.WANDB.GROUP,
             offline=cfg.LOGGER.WANDB.OFFLINE,
             id=cfg.LOGGER.WANDB.RESUME_ID,
             save_dir=cfg.FOLDER_EXP,
             version="",
             name=cfg.NAME,
             anonymous=False,
-            log_model=False,
+            log_model=True,
         )
         loggers.append(wandb_logger)
     if cfg.LOGGER.TENSORBOARD:

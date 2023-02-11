@@ -412,7 +412,7 @@ class MLD(BaseModel):
         return n_set
 
     def train_vae_forward(self, batch):
-        feats_ref = batch[0].permute(0,2,3,1).contiguous()
+        feats_ref = batch['motion'].permute(0,2,3,1).contiguous()
         feats_ref_shape = feats_ref.shape
         feats_ref = feats_ref.view(*feats_ref_shape[:2], feats_ref_shape[2]*feats_ref_shape[3])
         lengths = None
@@ -463,7 +463,7 @@ class MLD(BaseModel):
         return rs_set
 
     def train_diffusion_forward(self, batch):
-        feats_ref = batch[0].permute(0,2,3,1).contiguous()
+        feats_ref = batch['motion'].permute(0,2,3,1).contiguous()
         feats_ref_shape = feats_ref.shape
         feats_ref = feats_ref.view(*feats_ref_shape[:2], feats_ref_shape[2]*feats_ref_shape[3])
         lengths = None
@@ -547,7 +547,7 @@ class MLD(BaseModel):
 
         # prepare gt/refer for metric
         if not finetune_decoder:
-            feats_ref = batch[0].permute(0,2,3,1).contiguous()
+            feats_ref = batch['motion'].permute(0,2,3,1).contiguous()
             feats_ref_shape = feats_ref.shape
             feats_ref = feats_ref.view(*feats_ref_shape[:2], feats_ref_shape[2]*feats_ref_shape[3])
             feats_ref = feats_ref.detach()

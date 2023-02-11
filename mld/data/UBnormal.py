@@ -7,13 +7,30 @@ from mld.data.humanml.scripts.motion_process import (process_file,
 from .base import BASEDataModule
 
 # From COSKAD
-import argparse
-import yaml
+import pickle
 import sys
 sys.path.append('/media/odin/stdrr/projects/anomaly_detection/code/COSKAD/clean_code/HRAD_lightning')
-from utils.argparser import init_sub_args
-from utils.dataset import get_dataset_and_loader
+from utils.dataset import PoseDatasetMorais
+from utils.dataset_utils import ae_trans_list
 
+
+class PoseDatasetForDiffusion(PoseDatasetMorais):
+
+    def __init__(self, condition_length, **kwargs) -> None:
+        self.condition_length = condition_length
+        super().__init__(**kwargs)
+        assert self.condition_length < self.seg_len, "condition length should be smaller than segment length"
+        self.n_frames = self.seg_len - self.condition_length
+
+
+    def __getitem__(self, index):
+        item = super().__getitem__(index)
+        item_dict = dict()
+        item_dict['motion'] = item[0][:,:self.n_frames]
+        item_dict['motion_cond'] = item[0][:,self.n_frames:]
+        item_dict.update({f'metadata_{i}':m for i,m in enumerate(item[1:])})
+        return item_dict
+    
 
 class UBnormal(BASEDataModule):
 
@@ -29,36 +46,53 @@ class UBnormal(BASEDataModule):
                          collate_fn=collate_fn)
         self.save_hyperparameters(logger=False)
         self.name = "ubnormal"
-        args, dataset_args = cfg
+        self.cfg = args = cfg
+        self.condition_length = cfg.DATASET.condition_len
+        self.Dataset = PoseDatasetForDiffusion
 
-        if args.validation:
-            train_dataset, train_loader, val_dataset, val_loader = get_dataset_and_loader(dataset_args,split=args.split, validation=args.validation)
-            self.Dataset_val = val_dataset.__class__
-            self._val_dataset = val_dataset
-            self._val_loader = val_loader
+        if self.cfg.DATASET.num_transform > 0:
+            trans_list = ae_trans_list[:self.cfg.DATASET.num_transform]
+        else: trans_list = None
+
+        if args.DATASET.use_fitted_scaler:
+            with open('{}/robust.pkl'.format(args.EXP_DIR), 'rb') as handle:
+                scaler = pickle.load(handle)
+            print('Scaler loaded from {}'.format('{}/robust.pkl'.format(args.EXP_DIR)))
+        else: scaler = None
+
+        self.dataset_args = {'path_to_morais_data': args.DATASET.UBNORMAL.ROOT, 'exp_dir': args.EXP_DIR,
+                            'transform_list': trans_list, 'debug': args.DEBUG, 'headless': args.DATASET.headless,
+                            'seg_len': args.DATASET.seg_len, 'normalize_pose': args.DATASET.normalize_pose, 'kp18_format': args.DATASET.kp18_format,
+                            'vid_res': args.DATASET.vid_res, 'num_coords': args.DATASET.num_coords, 'sub_mean': args.DATASET.sub_mean,
+                            'return_indices': False, 'return_metadata': True, 'return_mean': args.DATASET.sub_mean,
+                            'symm_range': args.DATASET.symm_range, 'hip_center': args.DATASET.hip_center, 
+                            'normalization_strategy': args.DATASET.normalization_strategy, 'ckpt': args.EXP_DIR, 'scaler': scaler, 
+                            'kp_threshold':args.DATASET.kp_th, 'double_item': args.DATASET.double_item}
+
+        if args.DEBUG:
+            self._sample_set = self.get_sample_set(overrides=self.dataset_args)
+            self._train_dataset = self._sample_set
         else:
-            train_dataset, train_loader = get_dataset_and_loader(dataset_args,split=args.split, validation=args.validation)
-            self._val_dataset = train_dataset
-            self._val_loader = train_loader
-        self.Dataset = train_dataset.__class__
-        self._train_dataset = train_dataset
-        self._train_loader = train_loader
-        self.cfg = args
-        sample_overrides = {
-            "split": "val" if args.validation else "train",
-            "tiny": True,
-            "progress_bar": False
-        }
-        self._sample_set = self.get_sample_set(overrides=sample_overrides)
-        # Get additional info of the dataset
-        self.njoints = self._sample_set.V
-        self.nfeats = self.njoints * self._sample_set.num_coords
-        # self.transforms = self._sample_set.transforms
+            self._train_dataset = self.Dataset(condition_length=self.condition_length,
+                                            include_global=False,
+                                            split='train', **self.dataset_args)
+            self._sample_set = self._train_dataset
 
+        if args.VALIDATION and not args.DEBUG:
+            self._val_dataset = self.Dataset(condition_length=self.condition_length,
+                                            include_global=False,
+                                            split='val', **self.dataset_args)
+        else:
+            self._val_dataset = self._sample_set
+
+        self.train_dataset = self._train_dataset
+        self.val_dataset = self._val_dataset
+        self.njoints = 18 if args.DATASET.kp18_format else 17
+        self.nfeats = self.njoints * args.DATASET.num_coords
+        
     def get_sample_set(self, overrides={}):
-        if overrides['split'] == 'val':
-            return self._val_dataset
-        return self._train_dataset
+        self.dataset_args['debug'] = True
+        return self.Dataset(self.condition_length, **self.dataset_args)
 
     def feats2joints(self, features):
         # mean = torch.tensor(self.hparams.mean).to(features)
@@ -96,15 +130,3 @@ class UBnormal(BASEDataModule):
         else:
             self.is_mm = False
             self.test_dataset.name_list = self.name_list
-
-
-    # override the methods
-    def train_dataloader(self):
-        return self._train_loader
-
-    def predict_dataloader(self):
-        raise NotImplementedError('Predict dataloader is not implemented')
-
-    def val_dataloader(self):
-        # overrides batch_size and num_workers
-        return self._val_loader

@@ -148,12 +148,10 @@ def get_datasets(cfg, logger=None, phase="train"):
 
         # custom dataset
         elif dataset_name.lower() in ["ubnormal"]:
-            config_path = '/media/odin/stdrr/projects/anomaly_detection/code/COSKAD/clean_code/HRAD_lightning/config/UBnormal/diffusion.yaml'
-            args = yaml.load(open(config_path), Loader=yaml.FullLoader)
-            args = argparse.Namespace(**args)
-            args, dataset_args, _,_,_ = init_sub_args(args)
-
-            dataset = dataset_module_map[dataset_name.lower()](cfg=(args,dataset_args), batch_size=dataset_args.batch_size, num_workers=dataset_args.num_workers)
+            dataset = dataset_module_map[dataset_name.lower()](
+                cfg=cfg, 
+                batch_size=cfg.TRAIN.BATCH_SIZE, 
+                num_workers=cfg.TRAIN.NUM_WORKERS)
             datasets.append(dataset)
         else:
             raise NotImplementedError

@@ -13,6 +13,8 @@ DEBUG: False
 ACCELERATOR: 'gpu'
 # Index of GPUs eg. [0] or [0,1,2,3]
 DEVICE: [0,1]
+EXP_DIR: ./checkpoints
+VALIDATION: True
 
 #####################################
 # The following are training settings
@@ -23,11 +25,11 @@ TRAIN:
   # Training dataset name
   DATASETS: ['ubnormal']
   # Number of dataloader workers
-  NUM_WORKERS: 4
+  NUM_WORKERS: 8
   # Size of batches
-  BATCH_SIZE: 512
+  BATCH_SIZE: 1024
   # Total epochs for training
-  END_EPOCH: 20
+  END_EPOCH: 50
 
   RESUME: '' # Resume training from this path
   PRETRAINED_VAE: '' # vae model path
@@ -46,7 +48,7 @@ TRAIN:
 #####################################
 EVAL:
   DATASETS: ['ubnormal'] # Evaluating datasets
-  BATCH_SIZE: 32 # Evaluating Batch size
+  BATCH_SIZE: 1024 # Evaluating Batch size
   SPLIT: test
 
 #####################################
@@ -66,6 +68,24 @@ TEST:
 #####################################
 DATASET:
   JOINT_TYPE: 'mmm' # join type
+  # custom args from COSKAD
+  num_coords: 2
+  headless: False
+  seg_len: 12
+  num_transform: 5
+  sub_mean: False
+  symm_range: True
+  vid_res: [1080,720]
+  normalize_pose: True
+  kp18_format: False
+  batch_size: 1024
+  hip_center: False
+  normalization_strategy: 'robust' # use 'none' to avoid normalization, 'robust' otherwise
+  use_fitted_scaler: False
+  kp_th: 0
+  seg_th: 0
+  double_item: False
+  condition_len: 6
 
 #####################################
 # The following are metric settings
@@ -95,7 +115,7 @@ model:
   vae: true # whether vae model
   model_type: mld # model type
   condition: null
-  latent_dim: [1, 16] # latent dimension
+  latent_dim: [1, 32] # latent dimension
   ff_size: 256 # understand what's this
   num_layers: 4 # number of layers
   num_head: 3 # number of head layers
@@ -108,13 +128,13 @@ model:
 # The following are loggers settings
 #####################################
 LOGGER:
-  SACE_CHECKPOINT_EPOCH: 200
+  SACE_CHECKPOINT_EPOCH: 5
   LOG_EVERY_STEPS: 1
-  VAL_EVERY_STEPS: 200
+  VAL_EVERY_STEPS: 5
   TENSORBOARD: False
   WANDB:
     ENTITY: pinlab-sapienza
     PROJECT: coskad # comment for debug
     GROUP: mld_stdrr
-    OFFLINE: false
+    OFFLINE: False
     RESUME_ID: null

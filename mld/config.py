@@ -157,7 +157,7 @@ def parse_args(phase="train"):
     # params = {key: val for key, val in vars(opt).items() if val is not None}
 
     # update config from files
-    cfg_base = OmegaConf.load('/media/odin/stdrr/projects/anomaly_detection/code/motion-latent-diffusion/configs/base.yaml')
+    cfg_base = OmegaConf.load('./configs/base.yaml')
     cfg_exp = OmegaConf.merge(cfg_base, OmegaConf.load(params.cfg))
     cfg_model = get_module_config(cfg_exp.model, cfg_exp.model.target)
     cfg_assets = OmegaConf.load(params.cfg_assets)
@@ -167,7 +167,7 @@ def parse_args(phase="train"):
         cfg.TRAIN.BATCH_SIZE = (params.batch_size
                                 if params.batch_size else cfg.TRAIN.BATCH_SIZE)
         cfg.DEVICE = params.device if params.device else cfg.DEVICE
-        cfg.DEBUG = not params.nodebug if params.nodebug is not None else cfg.DEBUG
+        cfg.DEBUG = params.nodebug if params.nodebug is not None else cfg.DEBUG
 
         # no debug in test
         cfg.DEBUG = False if phase == "test" else cfg.DEBUG
