@@ -73,7 +73,7 @@ def main():
             version="",
             name=cfg.NAME,
             anonymous=False,
-            log_model=True,
+            log_model=not cfg.DEBUG,
         )
         loggers.append(wandb_logger)
     if cfg.LOGGER.TENSORBOARD:
@@ -158,6 +158,7 @@ def main():
         logger=loggers,
         callbacks=callbacks,
         check_val_every_n_epoch=cfg.LOGGER.VAL_EVERY_STEPS,
+        num_sanity_val_steps=0
     )
     logger.info("Trainer initialized")
 

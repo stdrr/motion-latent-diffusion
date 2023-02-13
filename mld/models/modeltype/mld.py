@@ -7,20 +7,21 @@ from torch import Tensor
 from torch.optim import AdamW
 from torchmetrics import MetricCollection
 import time
+from tqdm import tqdm
+from typing import List, Tuple
+from sklearn.metrics import roc_auc_score
 from mld.config import instantiate_from_config
 from os.path import join as pjoin
 from mld.models.architectures import (
-    mld_denoiser,
-    mld_vae,
-    vposert_vae,
     t2m_motionenc,
     t2m_textenc,
-    vposert_vae,
 )
+from mld.models.architectures.external_models.motion_encoders.stsgcn import STS_Encoder
+from mld.models.architectures.external_models.motion_encoders.MLP import MLP_encoder
 from mld.models.losses.mld import MLDLosses
 from mld.models.modeltype.base import BaseModel
 from mld.utils.temos_utils import remove_padding
-
+from mld.utils.eval_utils import score_process, filter_vecs_by_cond, windows_based_loss, padding
 from .base import BaseModel
 
 
@@ -84,6 +85,8 @@ class MLD(BaseModel):
 
         if self.condition in ["text", "text_uncond"]:
             self._get_t2m_evaluator(cfg)
+        elif 'motion' in self.condition:
+            self.denoiser.set_emb_proj(self._get_cond_motion_encoder(cfg))
 
         if cfg.TRAIN.OPTIM.TYPE.lower() == "adamw":
             self.optimizer = AdamW(lr=cfg.TRAIN.OPTIM.LR,
@@ -141,8 +144,28 @@ class MLD(BaseModel):
                 beta=0,
                 glob_rot=None,
                 get_rotations_back=False)
+        elif 'motion' in self.condition:
+            self.feats2joints = datamodule.feats2joints
         elif self.condition is None:
             self.feats2joints = datamodule.feats2joints
+
+    
+    #stdrr function
+    def _get_cond_motion_encoder(self, cfg):
+        if "sts" in self.condition:
+            return STS_Encoder(c_in=cfg.DATASET.num_coords, 
+                               h_dim=cfg.model.sts_hdim, 
+                               latent_dim=self.latent_dim[1],
+                               n_frames=cfg.DATASET.condition_len,
+                               n_joints=self.njoints)
+        elif "vae" in self.condition:
+            return lambda x: self.vae.encode(x)[0]
+        elif "mlp" in self.condition:
+            return MLP_encoder(input_dim=cfg.DATASET.condition_len*self.njoints*cfg.DATASET.num_coords,
+                               output_dim=self.latent_dim[1])
+        else:
+            raise NotImplementedError("Do not support other motion encoder for now.")
+
 
     def _get_t2m_evaluator(self, cfg):
         """
@@ -412,10 +435,8 @@ class MLD(BaseModel):
         return n_set
 
     def train_vae_forward(self, batch):
-        feats_ref = batch['motion'].permute(0,2,3,1).contiguous()
-        feats_ref_shape = feats_ref.shape
-        feats_ref = feats_ref.view(*feats_ref_shape[:2], feats_ref_shape[2]*feats_ref_shape[3])
-        lengths = None
+        feats_ref = batch['motion']
+        lengths = batch['length']
 
         if self.vae_type in ["mld", "vposert", "actor"]:
             motion_z, dist_m, lengths = self.vae.encode(feats_ref, lengths, return_lengths=True)
@@ -434,6 +455,9 @@ class MLD(BaseModel):
             mask = batch["mask"]
             joints_rst = self.feats2joints(feats_rst, mask)
             joints_ref = self.feats2joints(feats_ref, mask)
+        elif "motion" in self.condition:
+            joints_rst = self.feats2joints(feats_rst)
+            joints_ref = self.feats2joints(feats_ref)
         elif self.condition is None:
             joints_rst = self.feats2joints(feats_rst)
             joints_ref = self.feats2joints(feats_ref)
@@ -463,10 +487,8 @@ class MLD(BaseModel):
         return rs_set
 
     def train_diffusion_forward(self, batch):
-        feats_ref = batch['motion'].permute(0,2,3,1).contiguous()
-        feats_ref_shape = feats_ref.shape
-        feats_ref = feats_ref.view(*feats_ref_shape[:2], feats_ref_shape[2]*feats_ref_shape[3])
-        lengths = None
+        feats_ref = batch['motion']
+        lengths = batch['length']
         # motion encode
         with torch.no_grad():
             if self.vae_type in ["mld", "vposert", "actor"]:
@@ -489,6 +511,8 @@ class MLD(BaseModel):
             action = batch['action']
             # text encode
             cond_emb = action
+        elif "motion" in self.condition:
+            cond_emb = batch['motion_cond']
         elif self.condition is None:
             cond_emb = None
         else:
@@ -499,7 +523,7 @@ class MLD(BaseModel):
         return {**n_set}
 
     def test_diffusion_forward(self, batch, finetune_decoder=False):
-        lengths = None
+        lengths = batch["length"]
 
         if self.condition in ["text", "text_uncond"]:
             # get text embeddings
@@ -519,6 +543,8 @@ class MLD(BaseModel):
                     cond_emb,
                     torch.zeros_like(batch['action'],
                                      dtype=batch['action'].dtype))
+        elif "motion" in self.condition:
+            cond_emb = batch['motion_cond']
         elif self.condition is None:
             cond_emb = None
         else:
@@ -859,6 +885,136 @@ class MLD(BaseModel):
                     raise TypeError(f"Not support this metric {metric}")
 
         # return forward output rather than loss during test
-        if split in ["test"]:
-            return rs_set["joints_rst"], batch["length"]
+        if split in ["val", "test"]:
+            # return rs_set["joints_rst"], batch["length"]
+            n_frames = self.cfg.DATASET.seg_len - self.cfg.DATASET.condition_len
+            reshape_for_val = lambda x: x.reshape(-1,n_frames,self.njoints,self.cfg.DATASET.num_coords).permute(0,3,1,2).contiguous()
+            coskad_input = batch['coskad_input']
+            model_output = rs_set["gen_joints_rst"] if self.stage == "vae_diffusion" else rs_set["joints_rst"]
+            model_output = reshape_for_val(model_output)
+            gt_data = reshape_for_val(batch['motion'])
+            transformation_idx = coskad_input[1]
+            metadata = coskad_input[2]
+            actual_frames = coskad_input[3][:,self.cfg.DATASET.condition_len:]
+            return  model_output, \
+                    gt_data, \
+                    transformation_idx, \
+                    metadata, \
+                    actual_frames
         return loss
+
+    
+    def validation_epoch_end(self, outputs):
+        out, gt_data, trans, meta, frames = light_processing_data(outputs)
+        return self.post_processing(out, gt_data, trans, meta, frames)
+
+
+    # from COSKAD
+    def post_processing(self, out:np.ndarray, gt_data:np.ndarray, trans:int, meta:np.ndarray, frames:np.ndarray) -> float:
+        all_gts = [file_name for file_name in os.listdir(self.cfg.DATASET.UBNORMAL.GT_PATH) if file_name.endswith('.npy')] # CHANGE CHANGE
+        all_gts = sorted(all_gts)
+        scene_clips = [(int(fn.split('_')[0]), int(fn.split('_')[1].split('.')[0])) for fn in all_gts]
+
+        num_transform = self.cfg.DATASET.num_transform
+        loss_fn = torch.nn.L1Loss(reduction="none") # torch.nn.MSELoss(reduction='none')
+        smoothing = 50 
+        model_scores_transf = {}
+        dataset_gt_transf = {}
+        self.saved = False
+        
+        for transformation in tqdm(range(num_transform)):
+            dataset_gt = []
+            model_scores = []
+
+
+            for idx in range(len(all_gts)):
+                scene_idx, clip_idx = scene_clips[idx]
+                
+
+                gt = np.load(os.path.join(self.cfg.DATASET.UBNORMAL.GT_PATH, all_gts[idx])) 
+                
+                n_frames = gt.shape[0]
+                
+                cond_transform = (trans == transformation)
+                out_transform, gt_data_transform, meta_transform, frames_transform = filter_vecs_by_cond(cond_transform, out, gt_data, meta, frames)
+                
+                cond_scene_clip = (meta_transform[:, 0] == scene_idx) & (meta_transform[:, 1] == clip_idx)
+                out_scene_clip, gt_scene_clip, meta_scene_clip, frames_scene_clip = filter_vecs_by_cond(cond_scene_clip, out_transform, gt_data_transform, meta_transform, frames_transform)
+
+                figs_ids = sorted(list(set(meta_scene_clip[:, 2])))
+                error_per_person = []
+                
+                for fig in figs_ids:
+
+
+                    cond_fig = (meta_scene_clip[:, 2] == fig)
+                    out_fig, gt_fig, meta_fig, frames_fig = filter_vecs_by_cond(cond_fig, out_scene_clip, gt_scene_clip, meta_scene_clip, frames_scene_clip)
+                    
+                    loss_matrix = windows_based_loss(gt_fig, out_fig, frames_fig, n_frames, loss_fn=loss_fn)
+                    loss_matrix = np.where(loss_matrix == 0.0, np.nan, loss_matrix)
+                    fig_reconstruction_loss = np.nanmedian(loss_matrix, 0)
+                    fig_reconstruction_loss = np.where(np.isnan(fig_reconstruction_loss), 0, fig_reconstruction_loss) 
+                    
+
+
+                    if self.cfg.model.pad_size!=-1:
+                        fig_reconstruction_loss = padding(fig_reconstruction_loss, gt, self.cfg.model.pad_size)
+
+                    error_per_person.append(fig_reconstruction_loss)
+                    
+                try:
+                    clip_score = np.amax(np.stack(error_per_person, axis=0), axis=0)
+                except:
+                    pass
+                ### FOR AVENUE
+                # if clip_idx in masked_clips:
+                #     clip_score = clip_score[np.array(masked_clips[clip_idx])==1]
+                #     gt = gt[np.array(masked_clips[clip_idx])==1]
+
+                clip_score = score_process(clip_score, win_size=smoothing, dataname=self.cfg.EVAL.DATASETS[0], use_scaler=False)
+                model_scores.append(clip_score)
+                dataset_gt.append(gt)
+                    
+            model_scores = np.concatenate(model_scores, axis=0)
+            dataset_gt = np.concatenate(dataset_gt, axis=0)
+
+            model_scores_transf[transformation] = model_scores
+            dataset_gt_transf[transformation] = dataset_gt
+
+        pds = np.mean(np.stack(list(model_scores_transf.values()),0),0)
+        gt = dataset_gt_transf[0]
+        
+        auc = roc_auc_score(gt,pds)
+        self.log('validation_auc', auc)
+        
+        return auc
+
+
+def light_processing_data(data:List[torch.tensor]) -> Tuple[np.ndarray]:
+    
+    out = []
+    gt_data = []
+    trans = []
+    meta = []
+    frames = []
+
+    for data_array in data:
+        output = data_array[0]
+        tensor_data = data_array[1]
+        transformation_idx = data_array[2]
+        metadata = data_array[3]
+        actual_frames = data_array[4]
+        
+        out.append(output.cpu().numpy())
+        gt_data.append(tensor_data.cpu().numpy())
+        trans.append(transformation_idx.cpu().numpy())
+        meta.append(metadata.cpu().numpy())
+        frames.append(actual_frames.cpu().numpy())
+
+    out = np.concatenate(out, axis=0)
+    gt_data = np.concatenate(gt_data, axis=0)
+    trans = np.concatenate(trans, axis=0)
+    meta = np.concatenate(meta, axis=0)
+    frames = np.concatenate(frames, axis=0)
+
+    return out,gt_data,trans,meta,frames

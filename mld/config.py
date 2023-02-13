@@ -167,7 +167,7 @@ def parse_args(phase="train"):
         cfg.TRAIN.BATCH_SIZE = (params.batch_size
                                 if params.batch_size else cfg.TRAIN.BATCH_SIZE)
         cfg.DEVICE = params.device if params.device else cfg.DEVICE
-        cfg.DEBUG = params.nodebug if params.nodebug is not None else cfg.DEBUG
+        cfg.DEBUG = (not params.nodebug) if params.nodebug else cfg.DEBUG
 
         # no debug in test
         cfg.DEBUG = False if phase == "test" else cfg.DEBUG
@@ -202,5 +202,6 @@ def parse_args(phase="train"):
         cfg.NAME = "debug--" + cfg.NAME
         cfg.LOGGER.WANDB.OFFLINE = True
         cfg.LOGGER.VAL_EVERY_STEPS = 1
+        cfg.DATASET.NUM_WORKERS = 1
 
     return cfg

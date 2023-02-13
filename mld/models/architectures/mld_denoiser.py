@@ -75,6 +75,12 @@ class MldDenoiser(nn.Module):
                                         self.latent_dim,
                                         guidance_scale=guidance_scale,
                                         guidance_uncodp=guidance_uncondp)
+        elif 'motion' in self.condition:
+            self.time_proj = Timesteps(self.latent_dim, flip_sin_to_cos,
+                                       freq_shift)
+            self.time_embedding = TimestepEmbedding(self.latent_dim,
+                                                    self.latent_dim)
+            self.emb_proj = None # this will be set with the method set_emb_proj 
         elif self.condition is None:
             self.time_proj = Timesteps(text_encoded_dim, flip_sin_to_cos,
                                        freq_shift)
@@ -137,6 +143,10 @@ class MldDenoiser(nn.Module):
         else:
             raise ValueError(f"Not supported architechure{self.arch}!")
 
+    # stdrr function
+    def set_emb_proj(self, emb_proj):
+        self.emb_proj = emb_proj
+
     def forward(self,
                 sample,
                 timestep,
@@ -180,6 +190,12 @@ class MldDenoiser(nn.Module):
                 emb_latent = action_emb + time_emb
             else:
                 emb_latent = torch.cat((time_emb, action_emb), 0)
+        elif 'motion' in self.condition:
+            motion_emb = self.emb_proj(encoder_hidden_states)
+            if self.abl_plus:
+                emb_latent = motion_emb + time_emb
+            else:
+                emb_latent = torch.cat((time_emb, motion_emb), 0)
         elif self.condition is None:
             emb_latent = time_emb
         else:

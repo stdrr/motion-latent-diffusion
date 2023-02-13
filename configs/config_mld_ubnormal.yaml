@@ -3,7 +3,7 @@
 ####################################
 
 # Experiment name, more details in Section 'Experiment Name Explanation'
-NAME: vae_session_1
+NAME: diffusion_session_1
 # Debug mode. Set to True will enter the debug mode, then the program will
 # 1. use a tiny dataset for trianing and evaluation
 # 2. validate more intensively
@@ -21,7 +21,7 @@ VALIDATION: True
 #####################################
 TRAIN:
   # Model stage. Optional: "vae", "diffusion"
-  STAGE: vae
+  STAGE: vae_diffusion
   # Training dataset name
   DATASETS: ['ubnormal']
   # Number of dataloader workers
@@ -32,7 +32,7 @@ TRAIN:
   END_EPOCH: 50
 
   RESUME: '' # Resume training from this path
-  PRETRAINED_VAE: '' # vae model path
+  PRETRAINED_VAE: './experiments/mld/vae_session_1/checkpoints/epoch=49.ckpt' # vae model path
   OPTIM:
     TYPE: AdamW # Optimizer type
     LR: 1e-4 # Learning rate
@@ -112,25 +112,28 @@ LOSS:
 # The following are basic model settings
 #####################################
 model:
+  target: modules_coskad
   vae: true # whether vae model
   model_type: mld # model type
-  condition: null
+  condition: motion_vae
   latent_dim: [1, 32] # latent dimension
   ff_size: 256 # understand what's this
   num_layers: 4 # number of layers
   num_head: 3 # number of head layers
   droupout: 0.1 # dropout rate
   activation: gelu # activation type
-  guidance_scale: 7.5 #
+  guidance_scale: 1.0 #
   guidance_uncondp: 0.1 # 0.1 0.25
+  sts_hdim: 64
+  pad_size: -1
 
 #####################################
 # The following are loggers settings
 #####################################
 LOGGER:
-  SACE_CHECKPOINT_EPOCH: 5
+  SACE_CHECKPOINT_EPOCH: 1
   LOG_EVERY_STEPS: 1
-  VAL_EVERY_STEPS: 5
+  VAL_EVERY_STEPS: 1
   TENSORBOARD: False
   WANDB:
     ENTITY: pinlab-sapienza

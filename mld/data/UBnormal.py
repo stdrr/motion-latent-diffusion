@@ -26,9 +26,12 @@ class PoseDatasetForDiffusion(PoseDatasetMorais):
     def __getitem__(self, index):
         item = super().__getitem__(index)
         item_dict = dict()
-        item_dict['motion'] = item[0][:,:self.n_frames]
-        item_dict['motion_cond'] = item[0][:,self.n_frames:]
-        item_dict.update({f'metadata_{i}':m for i,m in enumerate(item[1:])})
+        item_dict['motion'] = torch.tensor(item[0][:,self.n_frames:]).permute(1,2,0).contiguous().flatten(start_dim=1) # shape T,V,C
+        item_dict['motion_cond'] = torch.tensor(item[0][:,:self.n_frames]).permute(1,2,0).contiguous().flatten(start_dim=1)
+        item_dict['length'] = self.n_frames
+        item_dict['coskad_input'] = item
+        item_dict['text'] = '' # for compatibility
+        # item_dict.update({f'metadata_{i}':m for i,m in enumerate(item[1:])})
         return item_dict
     
 
@@ -74,11 +77,15 @@ class UBnormal(BASEDataModule):
             self._train_dataset = self._sample_set
         else:
             self._train_dataset = self.Dataset(condition_length=self.condition_length,
-                                            include_global=False,
-                                            split='train', **self.dataset_args)
+                                               include_global=False,
+                                               split='train', **self.dataset_args)
             self._sample_set = self._train_dataset
 
         if args.VALIDATION and not args.DEBUG:
+            self._val_dataset = self.Dataset(condition_length=self.condition_length,
+                                            include_global=False,
+                                            split='val', **self.dataset_args)
+        elif args.VALIDATION:
             self._val_dataset = self.Dataset(condition_length=self.condition_length,
                                             include_global=False,
                                             split='val', **self.dataset_args)
@@ -95,17 +102,10 @@ class UBnormal(BASEDataModule):
         return self.Dataset(self.condition_length, **self.dataset_args)
 
     def feats2joints(self, features):
-        # mean = torch.tensor(self.hparams.mean).to(features)
-        # std = torch.tensor(self.hparams.std).to(features)
-        # features = features * std + mean
-        # return recover_from_ric(features, self.njoints)
         return features
 
     def joints2feats(self, features):
         features = process_file(features, self.njoints)[0]
-        # mean = torch.tensor(self.hparams.mean).to(features)
-        # std = torch.tensor(self.hparams.std).to(features)
-        # features = (features - mean) / std
         return features
 
     def renorm4t2m(self, features):
