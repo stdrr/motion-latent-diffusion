@@ -157,9 +157,10 @@ class MLD(BaseModel):
                                h_dim=cfg.model.sts_hdim, 
                                latent_dim=self.latent_dim[1],
                                n_frames=cfg.DATASET.condition_len,
-                               n_joints=self.njoints)
+                               n_joints=self.njoints,
+                               reshape=True)
         elif "vae" in self.condition:
-            return lambda x: self.vae.encode(x)[0]
+            return self.vae
         elif "mlp" in self.condition:
             return MLP_encoder(input_dim=cfg.DATASET.condition_len*self.njoints*cfg.DATASET.num_coords,
                                output_dim=self.latent_dim[1])

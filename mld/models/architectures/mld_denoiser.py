@@ -80,7 +80,6 @@ class MldDenoiser(nn.Module):
                                        freq_shift)
             self.time_embedding = TimestepEmbedding(self.latent_dim,
                                                     self.latent_dim)
-            self.emb_proj = None # this will be set with the method set_emb_proj 
         elif self.condition is None:
             self.time_proj = Timesteps(text_encoded_dim, flip_sin_to_cos,
                                        freq_shift)
@@ -145,7 +144,7 @@ class MldDenoiser(nn.Module):
 
     # stdrr function
     def set_emb_proj(self, emb_proj):
-        self.emb_proj = emb_proj
+        self.add_module('emb_proj', emb_proj)
 
     def forward(self,
                 sample,
@@ -191,7 +190,7 @@ class MldDenoiser(nn.Module):
             else:
                 emb_latent = torch.cat((time_emb, action_emb), 0)
         elif 'motion' in self.condition:
-            motion_emb = self.emb_proj(encoder_hidden_states)
+            motion_emb = self.emb_proj.encode_condition(encoder_hidden_states)
             if self.abl_plus:
                 emb_latent = motion_emb + time_emb
             else:

@@ -187,6 +187,14 @@ class MldVae(nn.Module):
             return latent, dist, lengths
         return latent, dist
 
+    # added by stdrr
+    def encode_condition(self,
+            features: Tensor,
+            lengths: Optional[List[int]] = None
+    ) -> Union[Tensor, Distribution]:
+        latent, _ = self.encode(features, lengths, False)
+        return latent
+
     def decode(self, z: Tensor, lengths: List[int]):
         mask = lengths_to_mask(lengths, z.device)
         bs, nframes = mask.shape

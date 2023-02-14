@@ -33,7 +33,7 @@ class STS_Encoder(nn.Module):
     
     name = 'sts_enc'
     
-    def __init__(self, c_in, h_dim=32, latent_dim=512, n_frames=12, n_joints=18, reshape=False, **kwargs) -> None:
+    def __init__(self, c_in, h_dim=32, latent_dim=512, n_frames=12, n_joints=18, **kwargs) -> None:
         super(STS_Encoder, self).__init__()
         
         dropout = kwargs.get('dropout', 0.3)
@@ -42,14 +42,10 @@ class STS_Encoder(nn.Module):
         
         self.btlnk = nn.Linear(in_features=h_dim * n_frames * n_joints, out_features=latent_dim)
 
-        if reshape:
-            self.reshape = lambda x: x.view(-1, n_frames, n_joints, c_in).permute(0,3,1,2).contiguous()
-        else:
-            self.reshape = lambda x: x
+        self.reshape = lambda x: x.view(-1, n_frames, n_joints, c_in).permute(0,3,1,2).contiguous()
         
 
     def encode(self, x, return_shape=False):
-        x = self.reshape(x)
         assert len(x.shape) == 4, f'Expected 4D input, got {x.shape}'
             
         x = self.encoder(x)
@@ -69,3 +65,9 @@ class STS_Encoder(nn.Module):
         x = self.encode(x)
         
         return x
+
+
+    def encode_condition(self, x):
+        x = self.reshape(x)
+        x = self.encode(x)
+        return x.unsqueeze(0)

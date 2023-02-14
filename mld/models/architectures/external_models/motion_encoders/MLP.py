@@ -13,3 +13,7 @@ class MLP_encoder(nn.Module):
         flat_input = input.reshape(input.shape[0], -1)
         output = self.motion_embedding(flat_input)
         return output
+
+    
+    def encode_condition(self, input):
+        return self.forward(input)
