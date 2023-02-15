@@ -26,8 +26,12 @@ class PoseDatasetForDiffusion(PoseDatasetMorais):
     def __getitem__(self, index):
         item = super().__getitem__(index)
         item_dict = dict()
-        item_dict['motion'] = torch.tensor(item[0][:,self.n_frames:]).permute(1,2,0).contiguous().flatten(start_dim=1) # shape T,V,C
-        item_dict['motion_cond'] = torch.tensor(item[0][:,:self.n_frames]).permute(1,2,0).contiguous().flatten(start_dim=1)
+        if self.condition_length > 0:
+            item_dict['motion'] = torch.tensor(item[0][:,self.n_frames:]).permute(1,2,0).contiguous().flatten(start_dim=1) # shape T,V,C
+            item_dict['motion_cond'] = torch.tensor(item[0][:,:self.n_frames]).permute(1,2,0).contiguous().flatten(start_dim=1)
+        else:
+            item_dict['motion'] = torch.tensor(item[0]).permute(1,2,0).contiguous().flatten(start_dim=1) # shape T,V,C
+            item_dict['motion_cond'] = item_dict['motion']
         item_dict['length'] = self.n_frames
         item_dict['coskad_input'] = item
         item_dict['text'] = '' # for compatibility

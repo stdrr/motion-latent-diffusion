@@ -1,12 +1,13 @@
+import torch
 import torch.nn as nn
 
 from mld.models.architectures.external_models.motion_encoders.stsgcn import STS_Encoder
 from mld.models.architectures.external_models.motion_decoders.stsgcn import STS_Decoder
 
-
-# pretrain encoder and decoder
 # aggiungere reco loss ad encoder cond
 
+def filter_state_dict(state_dict:dict, prefix=''):
+    return {k.replace(prefix,''):v for k,v in state_dict.items() if k.startswith(prefix)}
 
 
 class STSGCN(nn.Module):
@@ -18,8 +19,15 @@ class STSGCN(nn.Module):
         self.latent_dim = cfg.model.latent_dim[-1]
         self.n_frames = cfg.DATASET.seg_len - cfg.DATASET.condition_len
         self.n_joints = cfg.DATASET.NJOINTS
+        self.ckpt = cfg.TRAIN.PRETRAINED_ENC
+
         self.encoder = STS_Encoder(self.c_in, self.h_dim, self.latent_dim, self.n_frames, self.n_joints)
         self.decoder = STS_Decoder(self.c_in, self.h_dim, self.latent_dim, self.n_frames, self.n_joints)
+
+        if self.ckpt is not None:
+            sd = filter_state_dict(torch.load(self.ckpt)['state_dict'])
+            self.load_state_dict(sd)
+            print("Loaded STS model from {}".format(self.ckpt))
 
 
     def forward(self, x, lengths=None):
@@ -48,3 +56,8 @@ class STSGCN(nn.Module):
         feats_rst = self.decoder(z, self.feat_shape)
         feats_rst = feats_rst.permute(0,2,3,1).contiguous().view(-1, self.n_frames, self.n_joints*self.c_in)
         return feats_rst
+
+
+    def encode_conditon(self, features):
+        features,_ = self.encode(features)
+        return features

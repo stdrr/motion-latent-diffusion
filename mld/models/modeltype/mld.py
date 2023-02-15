@@ -25,6 +25,8 @@ from mld.utils.temos_utils import remove_padding
 from mld.utils.eval_utils import score_process, filter_vecs_by_cond, windows_based_loss, padding
 from .base import BaseModel
 
+from copy import deepcopy
+
 
 class MLD(BaseModel):
     """
@@ -48,6 +50,7 @@ class MLD(BaseModel):
         self.guidance_scale = cfg.model.guidance_scale
         self.guidance_uncodp = cfg.model.guidance_uncondp
         self.datamodule = datamodule
+        self.use_sts = cfg.model.use_sts
 
         try:
             self.vae_type = cfg.model.vae_type
@@ -58,8 +61,8 @@ class MLD(BaseModel):
         # self.text_encoder = instantiate_from_config(cfg.model.text_encoder)
 
         if self.vae_type != "no":
-            if self.vae_type == 'sts':
-                self.is_vae = False
+            if self.use_sts:
+                # self.is_vae = False
                 self.vae = STSGCN(self.cfg)
             else:
                 self.vae = instantiate_from_config(cfg.model.motion_vae)
@@ -158,14 +161,16 @@ class MLD(BaseModel):
     #stdrr function
     def _get_cond_motion_encoder(self, cfg):
         if "sts" in self.condition:
-            return STS_Encoder(c_in=cfg.DATASET.num_coords, 
-                               h_dim=cfg.model.sts_hdim, 
-                               latent_dim=self.latent_dim[1],
-                               n_frames=cfg.DATASET.condition_len,
-                               n_joints=self.njoints,
-                               reshape=True)
+            # return STS_Encoder(c_in=cfg.DATASET.num_coords, 
+            #                    h_dim=cfg.model.sts_hdim, 
+            #                    latent_dim=self.latent_dim[1],
+            #                    n_frames=cfg.DATASET.condition_len,
+            #                    n_joints=self.njoints)
+            return STSGCN(cfg) 
         elif "vae" in self.condition:
-            return self.vae
+            if cfg.model.same_vae:
+                return self.vae
+            return deepcopy(self.vae)
         elif "mlp" in self.condition:
             return MLP_encoder(input_dim=cfg.DATASET.condition_len*self.njoints*cfg.DATASET.num_coords,
                                output_dim=self.latent_dim[1])
