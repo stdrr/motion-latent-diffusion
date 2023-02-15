@@ -16,6 +16,7 @@ from mld.models.architectures import (
     t2m_motionenc,
     t2m_textenc,
 )
+from mld.models.architectures.external_models.sts_ae import STSGCN
 from mld.models.architectures.external_models.motion_encoders.stsgcn import STS_Encoder
 from mld.models.architectures.external_models.motion_encoders.MLP import MLP_encoder
 from mld.models.losses.mld import MLDLosses
@@ -57,7 +58,11 @@ class MLD(BaseModel):
         # self.text_encoder = instantiate_from_config(cfg.model.text_encoder)
 
         if self.vae_type != "no":
-            self.vae = instantiate_from_config(cfg.model.motion_vae)
+            if self.vae_type == 'sts':
+                self.is_vae = False
+                self.vae = STSGCN(self.cfg)
+            else:
+                self.vae = instantiate_from_config(cfg.model.motion_vae)
 
         # Don't train the motion encoder and decoder
         if self.stage == "diffusion":
@@ -439,7 +444,7 @@ class MLD(BaseModel):
         feats_ref = batch['motion']
         lengths = batch['length']
 
-        if self.vae_type in ["mld", "vposert", "actor"]:
+        if self.vae_type in ["mld", "vposert", "actor", "sts"]:
             motion_z, dist_m, lengths = self.vae.encode(feats_ref, lengths, return_lengths=True)
             feats_rst = self.vae.decode(motion_z, lengths)
         else:

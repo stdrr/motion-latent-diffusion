@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from external_models.modules import stsgcn
+from mld.models.architectures.external_models.modules import stsgcn
 
 class Decoder(nn.Module):
     def __init__(self, c_out, h_dim, n_frames, n_joints, dropout) -> None:
@@ -34,21 +34,19 @@ class STS_Decoder(nn.Module):
         super(STS_Decoder, self).__init__()
 
         dropout = kwargs.get('dropout', 0.3)
+        self.h_dim = h_dim
 
         self.decoder = Decoder(c_out=c_in, h_dim=h_dim, n_frames=n_frames, n_joints=n_joints, dropout=dropout)
         
         self.rev_btlnk = nn.Linear(in_features=latent_dim, out_features=h_dim * n_frames * n_joints)
+
     
     def decode(self, z, input_shape):
         # assert len(input_shape) == 4
-        N, V, C, T = input_shape
-        C = 32
+        N, _, T, V = input_shape
         z = self.rev_btlnk(z)
-        z = z.view(N, C, T, V).contiguous()
+        z = z.view(N, self.h_dim, T, V).contiguous()
         z = self.decoder(z)
-
-        # !Luca: Return the original shape
-        z = z.permute(0, 3, 1, 2).contiguous()
         
         return z
         
