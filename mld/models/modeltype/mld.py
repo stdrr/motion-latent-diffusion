@@ -50,7 +50,7 @@ class MLD(BaseModel):
         self.guidance_scale = cfg.model.guidance_scale
         self.guidance_uncodp = cfg.model.guidance_uncondp
         self.datamodule = datamodule
-        self.use_sts = cfg.model.use_sts
+        # self.use_sts = cfg.model.use_sts
 
         try:
             self.vae_type = cfg.model.vae_type
@@ -61,8 +61,8 @@ class MLD(BaseModel):
         # self.text_encoder = instantiate_from_config(cfg.model.text_encoder)
 
         if self.vae_type != "no":
-            if self.use_sts:
-                # self.is_vae = False
+            if self.vae_type == 'sts': # self.use_sts:
+                self.is_vae = False
                 self.vae = STSGCN(self.cfg)
             else:
                 self.vae = instantiate_from_config(cfg.model.motion_vae)
@@ -84,6 +84,11 @@ class MLD(BaseModel):
                     p.requires_grad = False
 
         self.denoiser = instantiate_from_config(cfg.model.denoiser)
+        if self.stage == "vae":
+            self.denoiser.training = False
+            for p in self.denoiser.parameters():
+                p.requires_grad = False
+
         if not self.predict_epsilon:
             cfg.model.scheduler.params['prediction_type'] = 'sample'
             cfg.model.noise_scheduler.params['prediction_type'] = 'sample'
@@ -154,7 +159,7 @@ class MLD(BaseModel):
                 get_rotations_back=False)
         elif 'motion' in self.condition:
             self.feats2joints = datamodule.feats2joints
-        elif self.condition is None:
+        elif self.condition == '':
             self.feats2joints = datamodule.feats2joints
 
     
@@ -174,6 +179,8 @@ class MLD(BaseModel):
         elif "mlp" in self.condition:
             return MLP_encoder(input_dim=cfg.DATASET.condition_len*self.njoints*cfg.DATASET.num_coords,
                                output_dim=self.latent_dim[1])
+        elif self.condition == '':
+            return None
         else:
             raise NotImplementedError("Do not support other motion encoder for now.")
 
@@ -469,7 +476,7 @@ class MLD(BaseModel):
         elif "motion" in self.condition:
             joints_rst = self.feats2joints(feats_rst)
             joints_ref = self.feats2joints(feats_ref)
-        elif self.condition is None:
+        elif self.condition == '':
             joints_rst = self.feats2joints(feats_rst)
             joints_ref = self.feats2joints(feats_ref)
 

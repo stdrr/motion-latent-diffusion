@@ -75,15 +75,15 @@ class MldDenoiser(nn.Module):
                                         self.latent_dim,
                                         guidance_scale=guidance_scale,
                                         guidance_uncodp=guidance_uncondp)
+        elif self.condition == '':
+            self.time_proj = Timesteps(text_encoded_dim, flip_sin_to_cos,
+                                       freq_shift)
+            self.time_embedding = TimestepEmbedding(text_encoded_dim,
+                                                    self.latent_dim)
         elif 'motion' in self.condition:
             self.time_proj = Timesteps(self.latent_dim, flip_sin_to_cos,
                                        freq_shift)
             self.time_embedding = TimestepEmbedding(self.latent_dim,
-                                                    self.latent_dim)
-        elif self.condition is None:
-            self.time_proj = Timesteps(text_encoded_dim, flip_sin_to_cos,
-                                       freq_shift)
-            self.time_embedding = TimestepEmbedding(text_encoded_dim,
                                                     self.latent_dim)
         else:
             raise TypeError(f"condition type {self.condition} not supported")
