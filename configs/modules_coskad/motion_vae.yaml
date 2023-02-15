@@ -13,3 +13,8 @@ motion_vae:
     latent_dim: ${model.latent_dim}
     nfeats: ${DATASET.NFEATS}
     ablation: ${TRAIN.ABLATION}
+
+
+motion_sts:
+  params:
+    h_dim: 64

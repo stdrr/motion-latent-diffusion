@@ -3,36 +3,36 @@
 ####################################
 
 # Experiment name, more details in Section 'Experiment Name Explanation'
-NAME: diffusion_session_1
+NAME: diffusion_session_5
 # Debug mode. Set to True will enter the debug mode, then the program will
 # 1. use a tiny dataset for trianing and evaluation
 # 2. validate more intensively
 # 3. will not use `wandb logger`
-DEBUG: False
+DEBUG: True
 # Devices. Optional: “cpu”, “gpu”
 ACCELERATOR: 'gpu'
 # Index of GPUs eg. [0] or [0,1,2,3]
-DEVICE: [0,1]
+DEVICE: [0,]
 EXP_DIR: ./checkpoints
-VALIDATION: True
+VALIDATION: False
 
 #####################################
 # The following are training settings
 #####################################
 TRAIN:
   # Model stage. Optional: "vae", "diffusion"
-  STAGE: vae_diffusion
+  STAGE: vae
   # Training dataset name
   DATASETS: ['ubnormal']
   # Number of dataloader workers
   NUM_WORKERS: 8
   # Size of batches
-  BATCH_SIZE: 1024
+  BATCH_SIZE: 2048
   # Total epochs for training
   END_EPOCH: 50
 
   RESUME: '' # Resume training from this path
-  PRETRAINED_VAE: './experiments/mld/vae_session_1/checkpoints/epoch=49.ckpt' # vae model path
+  PRETRAINED_VAE: null # vae model path
   OPTIM:
     TYPE: AdamW # Optimizer type
     LR: 1e-4 # Learning rate
@@ -67,7 +67,7 @@ TEST:
 # The following are basic datasets settings
 #####################################
 DATASET:
-  JOINT_TYPE: 'mmm' # join type
+  JOINT_TYPE: 'xyz' # join type
   # custom args from COSKAD
   num_coords: 2
   headless: False
@@ -114,9 +114,10 @@ LOSS:
 model:
   target: modules_coskad
   vae: true # whether vae model
+  vae_type: sts
   model_type: mld # model type
-  condition: motion_vae
-  latent_dim: [1, 32] # latent dimension
+  condition: motion_sts
+  latent_dim: [1, 16] # latent dimension
   ff_size: 256 # understand what's this
   num_layers: 4 # number of layers
   num_head: 3 # number of head layers
