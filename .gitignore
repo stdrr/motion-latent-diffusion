@@ -23,3 +23,6 @@
 /gepc
 /diffusion_AS
 *experiments/*
+/tbad
+/utils
+configs/assets.yaml
