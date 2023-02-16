@@ -30,6 +30,9 @@ class MLDLosses(Metric):
             # instance noise loss
             losses.append("inst_loss")
             losses.append("x_loss")
+            # Guido
+            if self.cfg.LOSS.LAMBDA_DECODER > 0:
+                losses.append("reconstruction_condition")
             if self.cfg.LOSS.LAMBDA_PRIOR != 0.0:
                 # prior noise loss
                 losses.append("prior_loss")
@@ -88,6 +91,10 @@ class MLDLosses(Metric):
                 self._losses_func[loss] = torch.nn.SmoothL1Loss(
                     reduction='mean')
                 self._params[loss] = cfg.LOSS.LAMBDA_LATENT
+            elif loss.split('_')[0] == 'reconstruction':
+                self._losses_func[loss] = torch.nn.L1Loss(
+                    reduction='mean')
+                self._params[loss] = cfg.LOSS.LAMBDA_DECODER
             else:
                 ValueError("This loss is not recognized.")
             if loss.split('_')[-1] == 'joints':
@@ -117,6 +124,10 @@ class MLDLosses(Metric):
                 # loss - prior loss
                 total += self._update_loss("prior_loss", rs_set['noise_prior'],
                                            rs_set['dist_m1'])
+            # Guido
+            if self.cfg.LOSS.LAMBDA_DECODER > 0:
+                total += self._update_loss("recons_condition", rs_set["rec_ae"],
+                                           rs_set["orig_ae"])
 
         if self.stage in ["vae_diffusion"]:
             # loss
