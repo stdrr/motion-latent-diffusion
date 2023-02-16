@@ -51,6 +51,7 @@ class MLD(BaseModel):
         self.guidance_uncodp = cfg.model.guidance_uncondp
         self.datamodule = datamodule
         self.use_sts = cfg.model.use_sts
+        self.use_decoder = True if cfg.LOSS.LAMBDA_DECODER>0.0 else False
 
         try:
             self.vae_type = cfg.model.vae_type
@@ -420,13 +421,21 @@ class MLD(BaseModel):
         noisy_latents = self.noise_scheduler.add_noise(latents.clone(), noise,
                                                        timesteps)
         # Predict the noise residual
-        noise_pred = self.denoiser(
+        # noise_pred = self.denoiser(
+        #     sample=noisy_latents,
+        #     timestep=timesteps,
+        #     encoder_hidden_states=encoder_hidden_states,
+        #     lengths=lengths,
+        #     return_dict=False,
+        # )[0]
+        noise_pred, motion_emb = self.denoiser(
             sample=noisy_latents,
             timestep=timesteps,
             encoder_hidden_states=encoder_hidden_states,
             lengths=lengths,
             return_dict=False,
-        )[0]
+        )
+        
         # Chunk the noise and noise_pred into two parts and compute the loss on each part separately.
         if self.cfg.LOSS.LAMBDA_PRIOR != 0.0:
             noise_pred, noise_pred_prior = torch.chunk(noise_pred, 2, dim=0)
@@ -443,6 +452,13 @@ class MLD(BaseModel):
         if not self.predict_epsilon:
             n_set["pred"] = noise_pred
             n_set["latent"] = latents
+        if self.use_decoder:
+            reconstructed = self.denoiser.emb_proj.decode(motion_emb)
+            orig = encoder_hidden_states.clone()
+            n_set.update({"rec_ae": reconstructed,
+                          "orig_ae": orig})
+            
+            
         return n_set
 
     def train_vae_forward(self, batch):

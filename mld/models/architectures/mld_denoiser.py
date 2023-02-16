@@ -247,7 +247,7 @@ class MldDenoiser(nn.Module):
         # 5. [batch_size, latent_dim[0], latent_dim[1]] <= [latent_dim[0], batch_size, latent_dim[1]]
         sample = sample.permute(1, 0, 2)
 
-        return (sample, )
+        return (sample, motion_emb)
 
 
 class EmbedAction(nn.Module):
