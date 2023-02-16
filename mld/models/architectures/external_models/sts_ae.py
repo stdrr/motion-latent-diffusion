@@ -4,8 +4,6 @@ import torch.nn as nn
 from mld.models.architectures.external_models.motion_encoders.stsgcn import STS_Encoder
 from mld.models.architectures.external_models.motion_decoders.stsgcn import STS_Decoder
 
-# aggiungere reco loss ad encoder cond
-
 def filter_state_dict(state_dict:dict, prefix=''):
     return {k.replace(prefix,''):v for k,v in state_dict.items() if k.startswith(prefix)}
 
@@ -25,7 +23,7 @@ class STSGCN(nn.Module):
         self.decoder = STS_Decoder(self.c_in, self.h_dim, self.latent_dim, self.n_frames, self.n_joints)
 
         if self.ckpt is not None:
-            sd = filter_state_dict(torch.load(self.ckpt)['state_dict'])
+            sd = filter_state_dict(torch.load(self.ckpt)['state_dict'], prefix='vae.')
             self.load_state_dict(sd)
             print("Loaded STS model from {}".format(self.ckpt))
 

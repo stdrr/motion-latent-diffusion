@@ -3,7 +3,7 @@
 ####################################
 
 # Experiment name, more details in Section 'Experiment Name Explanation'
-NAME: vae_session_3
+NAME: diffusion_session_6
 # Debug mode. Set to True will enter the debug mode, then the program will
 # 1. use a tiny dataset for trianing and evaluation
 # 2. validate more intensively
@@ -33,7 +33,7 @@ TRAIN:
 
   RESUME: '' # Resume training from this path
   PRETRAINED_VAE: null # vae model path
-  PRETRAINED_ENC: null # condition encoder path
+  PRETRAINED_ENC: './experiments/mld/sts_session_1/checkpoints/epoch=49.ckpt' # condition encoder path
   OPTIM:
     TYPE: AdamW # Optimizer type
     LR: 1e-4 # Learning rate
@@ -72,7 +72,7 @@ DATASET:
   # custom args from COSKAD
   num_coords: 2
   headless: False
-  seg_len: 6
+  seg_len: 12
   num_transform: 5
   sub_mean: False
   symm_range: True
@@ -86,7 +86,7 @@ DATASET:
   kp_th: 0
   seg_th: 0
   double_item: False
-  condition_len: 3
+  condition_len: 6
 
 #####################################
 # The following are metric settings
@@ -116,9 +116,9 @@ LOSS:
 model:
   target: modules_coskad
   vae: true # whether vae model
-  # vae_type: mld
+  vae_type: sts
   model_type: mld # model type
-  condition: motion_sts
+  condition: 'motion_sts' # 'motion_sts'
   same_vae: False
   latent_dim: [1, 16] # latent dimension
   ff_size: 256 # understand what's this
@@ -126,11 +126,10 @@ model:
   num_head: 3 # number of head layers
   droupout: 0.1 # dropout rate
   activation: gelu # activation type
-  guidance_scale: 7.5 #
+  guidance_scale: 1.0 #
   guidance_uncondp: 0.1 # 0.1 0.25
   sts_hdim: 64
   pad_size: -1
-  use_sts: False
 
 #####################################
 # The following are loggers settings

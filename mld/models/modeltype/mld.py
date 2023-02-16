@@ -50,7 +50,7 @@ class MLD(BaseModel):
         self.guidance_scale = cfg.model.guidance_scale
         self.guidance_uncodp = cfg.model.guidance_uncondp
         self.datamodule = datamodule
-        self.use_sts = cfg.model.use_sts
+        # self.use_sts = cfg.model.use_sts
         self.use_decoder = True if cfg.LOSS.LAMBDA_DECODER>0.0 else False
 
         try:
@@ -62,15 +62,15 @@ class MLD(BaseModel):
         # self.text_encoder = instantiate_from_config(cfg.model.text_encoder)
 
         if self.vae_type != "no":
-            if self.use_sts:
-                # self.is_vae = False
+            if self.vae_type == 'sts': # self.use_sts:
+                self.is_vae = False
                 self.vae = STSGCN(self.cfg)
             else:
                 self.vae = instantiate_from_config(cfg.model.motion_vae)
 
         # Don't train the motion encoder and decoder
         if self.stage == "diffusion":
-            if self.vae_type in ["mld", "vposert","actor"]:
+            if self.vae_type in ["mld", "vposert","actor", "sts"]:
                 self.vae.training = False
                 for p in self.vae.parameters():
                     p.requires_grad = False
@@ -85,6 +85,11 @@ class MLD(BaseModel):
                     p.requires_grad = False
 
         self.denoiser = instantiate_from_config(cfg.model.denoiser)
+        if self.stage == "vae":
+            self.denoiser.training = False
+            for p in self.denoiser.parameters():
+                p.requires_grad = False
+
         if not self.predict_epsilon:
             cfg.model.scheduler.params['prediction_type'] = 'sample'
             cfg.model.noise_scheduler.params['prediction_type'] = 'sample'
@@ -155,7 +160,7 @@ class MLD(BaseModel):
                 get_rotations_back=False)
         elif 'motion' in self.condition:
             self.feats2joints = datamodule.feats2joints
-        elif self.condition is None:
+        elif self.condition == '':
             self.feats2joints = datamodule.feats2joints
 
     
@@ -175,6 +180,8 @@ class MLD(BaseModel):
         elif "mlp" in self.condition:
             return MLP_encoder(input_dim=cfg.DATASET.condition_len*self.njoints*cfg.DATASET.num_coords,
                                output_dim=self.latent_dim[1])
+        elif self.condition == '':
+            return None
         else:
             raise NotImplementedError("Do not support other motion encoder for now.")
 
@@ -485,7 +492,7 @@ class MLD(BaseModel):
         elif "motion" in self.condition:
             joints_rst = self.feats2joints(feats_rst)
             joints_ref = self.feats2joints(feats_ref)
-        elif self.condition is None:
+        elif self.condition == '':
             joints_rst = self.feats2joints(feats_rst)
             joints_ref = self.feats2joints(feats_ref)
 
@@ -518,7 +525,7 @@ class MLD(BaseModel):
         lengths = batch['length']
         # motion encode
         with torch.no_grad():
-            if self.vae_type in ["mld", "vposert", "actor"]:
+            if self.vae_type in ["mld", "vposert", "actor", "sts"]:
                 z, dist = self.vae.encode(feats_ref, lengths)
             elif self.vae_type == "no":
                 z = feats_ref.permute(1, 0, 2)
@@ -582,7 +589,7 @@ class MLD(BaseModel):
             z = self._diffusion_reverse(cond_emb, lengths)
 
         with torch.no_grad():
-            if self.vae_type in ["mld", "vposert"]:
+            if self.vae_type in ["mld", "vposert", "sts"]:
                 feats_rst = self.vae.decode(z, lengths)
             elif self.vae_type == "no":
                 feats_rst = z.permute(1, 0, 2)
@@ -605,7 +612,7 @@ class MLD(BaseModel):
             feats_ref = feats_ref.view(*feats_ref_shape[:2], feats_ref_shape[2]*feats_ref_shape[3])
             feats_ref = feats_ref.detach()
             with torch.no_grad():
-                if self.vae_type in ["mld", "vposert"]:
+                if self.vae_type in ["mld", "vposert", "sts"]:
                     motion_z, dist_m = self.vae.encode(feats_ref, lengths)
                     recons_z, dist_rm = self.vae.encode(feats_rst, lengths)
                 elif self.vae_type == "no":
