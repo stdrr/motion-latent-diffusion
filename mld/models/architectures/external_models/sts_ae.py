@@ -43,7 +43,7 @@ class STSGCN(nn.Module):
                return_lengths=False):
         features = self.encoder.reshape(features)
         self.feat_shape = features.shape
-        z = self.encoder(features).unsqueeze(1)
+        z = self.encoder(features).unsqueeze(0)
         if return_lengths:
             return z, 0, lengths # this 0 replaces the dist_m variable
         return z, 0 # this 0 replaces the dist_m variable
@@ -52,12 +52,12 @@ class STSGCN(nn.Module):
     def decode(self,
                z,
                lengths=None):
-        z = z.squeeze(1)
+        z = z.squeeze(0)
         feats_rst = self.decoder(z, self.feat_shape)
         feats_rst = feats_rst.permute(0,2,3,1).contiguous().view(-1, self.n_frames, self.n_joints*self.c_in)
         return feats_rst
 
 
-    def encode_conditon(self, features):
+    def encode_condition(self, features):
         features,_ = self.encode(features)
         return features
