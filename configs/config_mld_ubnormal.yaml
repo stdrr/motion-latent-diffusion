@@ -21,7 +21,7 @@ VALIDATION: False
 #####################################
 TRAIN:
   # Model stage. Optional: "vae", "diffusion"
-  STAGE: vae
+  STAGE: vae_diffusion
   # Training dataset name
   DATASETS: ['ubnormal']
   # Number of dataloader workers
@@ -107,6 +107,7 @@ LOSS:
   LAMBDA_CROSS: 0.0 # Lambda for reconstruction Losses
   LAMBDA_CYCLE: 0.0 # Lambda for cycle Losses
   LAMBDA_PRIOR: 0.0
+  LAMBDA_DECODER: 1.0 # Lambda for reconstruction loss from motion condition encoder
   DIST_SYNC_ON_STEP: False # Sync Losses on step when distributed trained
 
 #####################################
@@ -141,7 +142,7 @@ LOGGER:
   TENSORBOARD: False
   WANDB:
     ENTITY: pinlab-sapienza
-    PROJECT: coskad # comment for debug
+    PROJECT: ~ # coskad # comment for debug
     GROUP: mld_stdrr
     OFFLINE: False
     RESUME_ID: null
