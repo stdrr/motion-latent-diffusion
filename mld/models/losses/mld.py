@@ -126,7 +126,7 @@ class MLDLosses(Metric):
                                            rs_set['dist_m1'])
             # Guido
             if self.cfg.LOSS.LAMBDA_DECODER > 0:
-                total += self._update_loss("recons_condition", rs_set["rec_ae"],
+                total += self._update_loss("reconstruction_condition", rs_set["rec_ae"],
                                            rs_set["orig_ae"])
 
         if self.stage in ["vae_diffusion"]:
