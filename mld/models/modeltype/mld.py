@@ -69,7 +69,7 @@ class MLD(BaseModel):
 
         # Don't train the motion encoder and decoder
         if self.stage == "diffusion":
-            if self.vae_type in ["mld", "vposert","actor"]:
+            if self.vae_type in ["mld", "vposert","actor", "sts"]:
                 self.vae.training = False
                 for p in self.vae.parameters():
                     p.requires_grad = False
@@ -509,7 +509,7 @@ class MLD(BaseModel):
         lengths = batch['length']
         # motion encode
         with torch.no_grad():
-            if self.vae_type in ["mld", "vposert", "actor"]:
+            if self.vae_type in ["mld", "vposert", "actor", "sts"]:
                 z, dist = self.vae.encode(feats_ref, lengths)
             elif self.vae_type == "no":
                 z = feats_ref.permute(1, 0, 2)
@@ -573,7 +573,7 @@ class MLD(BaseModel):
             z = self._diffusion_reverse(cond_emb, lengths)
 
         with torch.no_grad():
-            if self.vae_type in ["mld", "vposert"]:
+            if self.vae_type in ["mld", "vposert", "sts"]:
                 feats_rst = self.vae.decode(z, lengths)
             elif self.vae_type == "no":
                 feats_rst = z.permute(1, 0, 2)
@@ -596,7 +596,7 @@ class MLD(BaseModel):
             feats_ref = feats_ref.view(*feats_ref_shape[:2], feats_ref_shape[2]*feats_ref_shape[3])
             feats_ref = feats_ref.detach()
             with torch.no_grad():
-                if self.vae_type in ["mld", "vposert"]:
+                if self.vae_type in ["mld", "vposert", "sts"]:
                     motion_z, dist_m = self.vae.encode(feats_ref, lengths)
                     recons_z, dist_rm = self.vae.encode(feats_rst, lengths)
                 elif self.vae_type == "no":

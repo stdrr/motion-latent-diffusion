@@ -4,8 +4,6 @@ import torch.nn as nn
 from mld.models.architectures.external_models.motion_encoders.stsgcn import STS_Encoder
 from mld.models.architectures.external_models.motion_decoders.stsgcn import STS_Decoder
 
-# aggiungere reco loss ad encoder cond
-
 def filter_state_dict(state_dict:dict, prefix=''):
     return {k.replace(prefix,''):v for k,v in state_dict.items() if k.startswith(prefix)}
 
@@ -25,7 +23,7 @@ class STSGCN(nn.Module):
         self.decoder = STS_Decoder(self.c_in, self.h_dim, self.latent_dim, self.n_frames, self.n_joints)
 
         if self.ckpt is not None:
-            sd = filter_state_dict(torch.load(self.ckpt)['state_dict'])
+            sd = filter_state_dict(torch.load(self.ckpt)['state_dict'], prefix='vae.')
             self.load_state_dict(sd)
             print("Loaded STS model from {}".format(self.ckpt))
 
@@ -43,7 +41,7 @@ class STSGCN(nn.Module):
                return_lengths=False):
         features = self.encoder.reshape(features)
         self.feat_shape = features.shape
-        z = self.encoder(features).unsqueeze(1)
+        z = self.encoder(features).unsqueeze(0)
         if return_lengths:
             return z, 0, lengths # this 0 replaces the dist_m variable
         return z, 0 # this 0 replaces the dist_m variable
@@ -52,12 +50,12 @@ class STSGCN(nn.Module):
     def decode(self,
                z,
                lengths=None):
-        z = z.squeeze(1)
+        z = z.squeeze(0)
         feats_rst = self.decoder(z, self.feat_shape)
         feats_rst = feats_rst.permute(0,2,3,1).contiguous().view(-1, self.n_frames, self.n_joints*self.c_in)
         return feats_rst
 
 
-    def encode_conditon(self, features):
+    def encode_condition(self, features):
         features,_ = self.encode(features)
         return features
