@@ -8,13 +8,14 @@ NAME: diffusion_session_6
 # 1. use a tiny dataset for trianing and evaluation
 # 2. validate more intensively
 # 3. will not use `wandb logger`
-DEBUG: True
+DEBUG: false
 # Devices. Optional: “cpu”, “gpu”
 ACCELERATOR: 'gpu'
 # Index of GPUs eg. [0] or [0,1,2,3]
 DEVICE: [0,]
 EXP_DIR: ./checkpoints
 VALIDATION: False
+num_sanity_val_steps: -1 # -1 all, 0 None, else #Batches
 
 #####################################
 # The following are training settings
@@ -51,6 +52,7 @@ EVAL:
   DATASETS: ['ubnormal'] # Evaluating datasets
   BATCH_SIZE: 1024 # Evaluating Batch size
   SPLIT: test
+  type: latent # motion or latent
 
 #####################################
 # The following are testing settings
@@ -130,6 +132,7 @@ model:
   guidance_uncondp: 0.1 # 0.1 0.25
   sts_hdim: 64
   pad_size: -1
+  smoothing: 50
 
 #####################################
 # The following are loggers settings
