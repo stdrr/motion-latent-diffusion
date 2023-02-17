@@ -51,11 +51,18 @@ def compute_fig_matrix(pos, frames_pos, n_frames):
 
 
 def windows_based_loss(gt_fig, out_fig, frames_fig, n_frames, loss_fn=nn.MSELoss(reduction="none")):
-    assert len(gt_fig.shape) == 4
-    w, dim, timesteps, joints = gt_fig.shape
+    # assert len(gt_fig.shape) == 4
+    if len(gt_fig.shape) == 4:
+        w, dim, timesteps, joints = gt_fig.shape
 
-    gt_fig = gt_fig.transpose(0, 2, 3, 1).reshape(-1, timesteps*joints*dim)
-    out_fig = out_fig.transpose(0, 2, 3, 1).reshape(-1, timesteps*joints*dim)
+        gt_fig = gt_fig.transpose(0, 2, 3, 1).reshape(-1, timesteps*joints*dim)
+        out_fig = out_fig.transpose(0, 2, 3, 1).reshape(-1, timesteps*joints*dim)
+    
+    elif len(gt_fig.shape) == 3:
+        w, dim, timesteps = gt_fig.shape
+
+        gt_fig = gt_fig.squeeze(1)
+        out_fig = out_fig.squeeze(1)
 
     # loss_fn = nn.MSELoss(reduction="none")
     gt_fig = torch.from_numpy(gt_fig).cuda()
@@ -158,12 +165,12 @@ def calculate_loss(loss_func, input, target, dataname, to_pow=False):
     return reco_loss.detach().cpu().numpy()
 
 
-def score_process(score, win_size=50, dataname='STC', use_scaler = False):
+def score_process(score, smoothing=50, dataname='STC', use_scaler = False):
     
     scores_shifted = np.zeros_like(score)
-    shift = 8 + (8 // 2) - 1
+    shift = 8 + (8 // 2) - 1 # per gli amici 3
     scores_shifted[shift:] = score[:-shift]
-    score = gaussian_filter1d(scores_shifted, 30)
+    score = gaussian_filter1d(scores_shifted, smoothing)
         
     return score
 

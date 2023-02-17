@@ -924,9 +924,11 @@ class MLD(BaseModel):
             n_frames = self.cfg.DATASET.seg_len - self.cfg.DATASET.condition_len
             reshape_for_val = lambda x: x.reshape(-1,n_frames,self.njoints,self.cfg.DATASET.num_coords).permute(0,3,1,2).contiguous()
             coskad_input = batch['coskad_input']
-            model_output = rs_set["gen_joints_rst"] if self.stage == "vae_diffusion" else rs_set["joints_rst"]
-            model_output = reshape_for_val(model_output)
-            gt_data = reshape_for_val(batch['motion'])
+            # model_output = rs_set["gen_joints_rst"] if self.stage == "vae_diffusion" else rs_set["joints_rst"]
+            # model_output = reshape_for_val(model_output)
+            model_output = rs_set["noise_pred"]
+            # gt_data = reshape_for_val(batch['motion'])
+            gt_data = rs_set["noise"]
             transformation_idx = coskad_input[1]
             metadata = coskad_input[2]
             actual_frames = coskad_input[3][:,self.cfg.DATASET.condition_len:]
@@ -951,7 +953,7 @@ class MLD(BaseModel):
 
         num_transform = self.cfg.DATASET.num_transform
         loss_fn = torch.nn.L1Loss(reduction="none") # torch.nn.MSELoss(reduction='none')
-        smoothing = 50 
+        smoothing = 30 
         model_scores_transf = {}
         dataset_gt_transf = {}
         self.saved = False
@@ -1005,7 +1007,7 @@ class MLD(BaseModel):
                 #     clip_score = clip_score[np.array(masked_clips[clip_idx])==1]
                 #     gt = gt[np.array(masked_clips[clip_idx])==1]
 
-                clip_score = score_process(clip_score, win_size=smoothing, dataname=self.cfg.EVAL.DATASETS[0], use_scaler=False)
+                clip_score = score_process(clip_score, smoothing=smoothing, dataname=self.cfg.EVAL.DATASETS[0], use_scaler=False)
                 model_scores.append(clip_score)
                 dataset_gt.append(gt)
                     
@@ -1015,7 +1017,7 @@ class MLD(BaseModel):
             model_scores_transf[transformation] = model_scores
             dataset_gt_transf[transformation] = dataset_gt
 
-        pds = np.mean(np.stack(list(model_scores_transf.values()),0),0)
+        pds = np.amax(np.stack(list(model_scores_transf.values()),0),0)
         gt = dataset_gt_transf[0]
         
         auc = roc_auc_score(gt,pds)
