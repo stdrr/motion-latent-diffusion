@@ -51,6 +51,8 @@ class MLD(BaseModel):
         self.guidance_scale = cfg.model.guidance_scale
         self.guidance_uncodp = cfg.model.guidance_uncondp
         self.datamodule = datamodule
+        self.smoothing_win = cfg.model.smoothing
+        self.eval_type = cfg.EVAL.type
         # self.use_sts = cfg.model.use_sts
         self.use_decoder = True if cfg.LOSS.LAMBDA_DECODER>0.0 else False
 
@@ -925,13 +927,15 @@ class MLD(BaseModel):
         if split in ["val", "test"]:
             # return rs_set["joints_rst"], batch["length"]
             n_frames = self.cfg.DATASET.seg_len - self.cfg.DATASET.condition_len
-            reshape_for_val = lambda x: x.reshape(-1,n_frames,self.njoints,self.cfg.DATASET.num_coords).permute(0,3,1,2).contiguous()
             coskad_input = batch['coskad_input']
-            # model_output = rs_set["gen_joints_rst"] if self.stage == "vae_diffusion" else rs_set["joints_rst"]
-            # model_output = reshape_for_val(model_output)
-            model_output = rs_set["lat_rm"]
-            # gt_data = reshape_for_val(batch['motion'])
-            gt_data = rs_set["lat_m"]
+            if self.eval_type == 'motion':
+                reshape_for_val = lambda x: x.reshape(-1,n_frames,self.njoints,self.cfg.DATASET.num_coords).permute(0,3,1,2).contiguous()
+                model_output = rs_set["gen_joints_rst"] if self.stage == "vae_diffusion" else rs_set["joints_rst"]
+                model_output = reshape_for_val(model_output)
+                gt_data = reshape_for_val(batch['motion'])
+            elif self.eval_type == 'latent':
+                model_output = rs_set["noise_pred"]
+                gt_data = rs_set["noise"]
             transformation_idx = coskad_input[1]
             metadata = coskad_input[2]
             actual_frames = coskad_input[3][:,self.cfg.DATASET.condition_len:]
@@ -974,7 +978,7 @@ class MLD(BaseModel):
 
         num_transform = self.cfg.DATASET.num_transform
         loss_fn = torch.nn.L1Loss(reduction="none") # torch.nn.MSELoss(reduction='none')
-        smoothing = 30 
+        # smoothing = 30 
         model_scores_transf = {}
         dataset_gt_transf = {}
         self.saved = False
@@ -1028,7 +1032,7 @@ class MLD(BaseModel):
                 #     clip_score = clip_score[np.array(masked_clips[clip_idx])==1]
                 #     gt = gt[np.array(masked_clips[clip_idx])==1]
 
-                clip_score = score_process(clip_score, smoothing=smoothing, dataname=self.cfg.EVAL.DATASETS[0], use_scaler=False)
+                clip_score = score_process(clip_score, smoothing=self.smoothing_win, dataname=self.cfg.EVAL.DATASETS[0], use_scaler=False)
                 model_scores.append(clip_score)
                 dataset_gt.append(gt)
                     
