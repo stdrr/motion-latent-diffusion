@@ -43,9 +43,9 @@ class STS_Decoder(nn.Module):
     
     def decode(self, z, input_shape):
         # assert len(input_shape) == 4
-        N, _, T, V = input_shape
+        _, T, V = input_shape
         z = self.rev_btlnk(z)
-        z = z.view(N, self.h_dim, T, V).contiguous()
+        z = z.view(-1, self.h_dim, T, V).contiguous()
         z = self.decoder(z)
         
         return z

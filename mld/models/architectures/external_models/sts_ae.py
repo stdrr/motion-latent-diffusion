@@ -22,6 +22,8 @@ class STSGCN(nn.Module):
         self.encoder = STS_Encoder(self.c_in, self.h_dim, self.latent_dim, self.n_frames, self.n_joints)
         self.decoder = STS_Decoder(self.c_in, self.h_dim, self.latent_dim, self.n_frames, self.n_joints)
 
+        self.feat_shape = [self.c_in, self.n_frames, self.n_joints]
+
         if self.ckpt is not None:
             sd = filter_state_dict(torch.load(self.ckpt)['state_dict'], prefix='vae.')
             self.load_state_dict(sd)
@@ -40,7 +42,6 @@ class STSGCN(nn.Module):
                lengths=None,
                return_lengths=False):
         features = self.encoder.reshape(features)
-        self.feat_shape = features.shape
         z = self.encoder(features).unsqueeze(0)
         if return_lengths:
             return z, 0, lengths # this 0 replaces the dist_m variable

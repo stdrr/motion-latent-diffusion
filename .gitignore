@@ -28,3 +28,4 @@
 configs/assets.yaml
 /datasets
 configs/guido_config_mld_ubnormal.yaml
+*results
