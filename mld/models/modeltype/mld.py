@@ -52,6 +52,7 @@ class MLD(BaseModel):
         self.datamodule = datamodule
         self.smoothing_win = cfg.model.smoothing
         self.eval_type = cfg.EVAL.type
+        self.eval_outs = cfg.EVAL.num_repetition
         # self.use_sts = cfg.model.use_sts
         self.use_decoder = True if cfg.LOSS.LAMBDA_DECODER>0.0 else False
 
@@ -927,12 +928,37 @@ class MLD(BaseModel):
             coskad_input = batch['coskad_input']
             if self.eval_type == 'motion':
                 reshape_for_val = lambda x: x.reshape(-1,n_frames,self.njoints,self.cfg.DATASET.num_coords).permute(0,3,1,2).contiguous()
-                model_output = rs_set["gen_joints_rst"] if self.stage == "vae_diffusion" else rs_set["joints_rst"]
-                model_output = reshape_for_val(model_output)
-                gt_data = reshape_for_val(batch['motion'])
+                if self.eval_outs > 1:
+                    fut_poses = []
+                    if self.stage == "vae_diffusion":
+                        for i in range(self.eval_outs):
+                            h = self.test_diffusion_forward(batch, finetune_decoder=True)["joints_rst"]
+                            fut_poses.append(h)
+                    elif self.stage == "diffusion":
+                        raise ValueError("Not possible with only diffusion step")
+                    else:
+                        for i in range(self.eval_outs):
+                            h = self.train_vae_forward(batch, finetune_decoder=True)["joints_rst"]
+                            fut_poses.append(h)
+                    fut_poses = torch.mean(torch.stack(fut_poses, dim=0), 0)
+                    gt_data = reshape_for_val(batch['motion'])
+                    model_output = reshape_for_val(fut_poses)
+                else:
+                    model_output = rs_set["gen_joints_rst"] if self.stage == "vae_diffusion" else rs_set["joints_rst"]
+                    model_output = reshape_for_val(model_output)
+                    gt_data = reshape_for_val(batch['motion'])
             elif self.eval_type == 'latent':
-                model_output = rs_set["noise_pred"]
-                gt_data = rs_set["noise"]
+                if self.eval_outs > 1:
+                    gen_latents = []
+                    for _ in range(self.eval_outs):
+                        h = self.test_diffusion_forward(batch, finetune_decoder=True)["lat_t"]
+                        gen_latents.append(h)
+                    gen_latents = torch.mean(torch.stack(gen_latents, dim=0), 0)
+                    gt_data = rs_set["lat_m"]
+                    model_output = gen_latents.clone()
+                else:                    
+                    model_output = rs_set["lat_m"]
+                    gt_data = rs_set["lat_t"]
             transformation_idx = coskad_input[1]
             metadata = coskad_input[2]
             actual_frames = coskad_input[3][:,self.cfg.DATASET.condition_len:]
