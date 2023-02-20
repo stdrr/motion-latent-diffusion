@@ -150,8 +150,9 @@ def get_datasets(cfg, logger=None, phase="train"):
         elif dataset_name.lower() in ["ubnormal"]:
             dataset = dataset_module_map[dataset_name.lower()](
                 cfg=cfg, 
-                batch_size=cfg.TRAIN.BATCH_SIZE, 
-                num_workers=cfg.TRAIN.NUM_WORKERS)
+                batch_size=cfg.TRAIN.BATCH_SIZE if phase=="train" else cfg.TEST.BATCH_SIZE, 
+                num_workers=cfg.TRAIN.NUM_WORKERS if phase=="train" else cfg.TEST.BATCH_SIZE,
+                phase=phase)
             datasets.append(dataset)
         else:
             raise NotImplementedError

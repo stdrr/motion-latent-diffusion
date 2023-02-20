@@ -26,6 +26,7 @@ from mld.utils.eval_utils import score_process, filter_vecs_by_cond, windows_bas
 from .base import BaseModel
 
 from copy import deepcopy
+import pytorch_lightning as pl
 
 
 class MLD(BaseModel):
@@ -610,9 +611,9 @@ class MLD(BaseModel):
 
         # prepare gt/refer for metric
         if not finetune_decoder:
-            feats_ref = batch['motion'].permute(0,2,3,1).contiguous()
-            feats_ref_shape = feats_ref.shape
-            feats_ref = feats_ref.view(*feats_ref_shape[:2], feats_ref_shape[2]*feats_ref_shape[3])
+            feats_ref = batch['motion'] #.permute(0,2,3,1).contiguous()
+            # feats_ref_shape = feats_ref.shape
+            # feats_ref = feats_ref.view(*feats_ref_shape[:2], feats_ref_shape[2]*feats_ref_shape[3])
             feats_ref = feats_ref.detach()
             with torch.no_grad():
                 if self.vae_type in ["mld", "vposert", "sts"]:
@@ -859,6 +860,8 @@ class MLD(BaseModel):
             elif self.condition == 'action':
                 # use a2m evaluators
                 rs_set = self.a2m_eval(batch)
+            elif 'motion' in self.condition:
+                rs_set = self.test_diffusion_forward(batch, finetune_decoder=False)
             # MultiModality evaluation sperately
             if self.trainer.datamodule.is_mm:
                 metrics_dicts = ['MMMetrics']
@@ -969,15 +972,33 @@ class MLD(BaseModel):
                     actual_frames
         return loss
 
+
+    def load_state_dict(self, state_dict, strict=True):
+        # new_state_dict = {}
+        # for k, v in state_dict.items():
+        #     if 'emb_proj' in k:
+        #         new_k = k.split('.')
+        #         new_k = '.'.join(new_k[:2]+[new_k[2]]*2+new_k[3:])
+        #         new_state_dict[new_k] = v
+        #     else:
+        #         new_state_dict[k] = v
+        return pl.LightningModule.load_state_dict(self, state_dict=state_dict, strict=strict)
+
     
     def validation_epoch_end(self, outputs):
         out, gt_data, trans, meta, frames = light_processing_data(outputs)
-        return self.post_processing(out, gt_data, trans, meta, frames)
+        return self.post_processing(out, gt_data, trans, meta, frames, split='validation')
+
+
+    def test_epoch_end(self, outputs):
+        out, gt_data, trans, meta, frames = light_processing_data(outputs)
+        return {'AUC':self.post_processing(out, gt_data, trans, meta, frames, split='test')}
 
 
     # from COSKAD
-    def post_processing(self, out:np.ndarray, gt_data:np.ndarray, trans:int, meta:np.ndarray, frames:np.ndarray) -> float:
-        all_gts = [file_name for file_name in os.listdir(self.cfg.DATASET.UBNORMAL.GT_PATH) if file_name.endswith('.npy')] # CHANGE CHANGE
+    def post_processing(self, out:np.ndarray, gt_data:np.ndarray, trans:int, meta:np.ndarray, frames:np.ndarray, split='') -> float:
+        gt_path = self.cfg.DATASET.UBNORMAL.GT_PATH if split == 'test' else self.cfg.DATASET.UBNORMAL.GT_PATH_VAL
+        all_gts = [file_name for file_name in os.listdir(gt_path) if file_name.endswith('.npy')] # CHANGE CHANGE
         all_gts = sorted(all_gts)
         scene_clips = [(int(fn.split('_')[0]), int(fn.split('_')[1].split('.')[0])) for fn in all_gts]
 
@@ -1051,7 +1072,7 @@ class MLD(BaseModel):
         gt = dataset_gt_transf[0]
         
         auc = roc_auc_score(gt,pds)
-        self.log('validation_auc', auc)
+        self.log(f'{split}_auc', auc)
         
         return auc
 

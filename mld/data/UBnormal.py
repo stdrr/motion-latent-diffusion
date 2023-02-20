@@ -75,29 +75,40 @@ class UBnormal(BASEDataModule):
                             'symm_range': args.DATASET.symm_range, 'hip_center': args.DATASET.hip_center, 
                             'normalization_strategy': args.DATASET.normalization_strategy, 'ckpt': args.EXP_DIR, 'scaler': scaler, 
                             'kp_threshold':args.DATASET.kp_th, 'double_item': args.DATASET.double_item}
+        if phase == "train":
+            if args.DEBUG:
+                self._sample_set = self.get_sample_set(overrides=self.dataset_args)
+                self._train_dataset = self._sample_set
+            else:
+                self._train_dataset = self.Dataset(condition_length=self.condition_length,
+                                                include_global=False,
+                                                split='train', **self.dataset_args)
+                self._sample_set = self._train_dataset
 
-        if args.DEBUG:
-            self._sample_set = self.get_sample_set(overrides=self.dataset_args)
-            self._train_dataset = self._sample_set
-        else:
-            self._train_dataset = self.Dataset(condition_length=self.condition_length,
-                                               include_global=False,
-                                               split='train', **self.dataset_args)
-            self._sample_set = self._train_dataset
+            if args.VALIDATION and not args.DEBUG:
+                self._val_dataset = self.Dataset(condition_length=self.condition_length,
+                                                include_global=False,
+                                                split='val', **self.dataset_args)
+            elif args.VALIDATION:
+                self._val_dataset = self.Dataset(condition_length=self.condition_length,
+                                                include_global=False,
+                                                split='val', **self.dataset_args)
+            else:
+                self._val_dataset = self._sample_set
 
-        if args.VALIDATION and not args.DEBUG:
-            self._val_dataset = self.Dataset(condition_length=self.condition_length,
+            self.train_dataset = self._train_dataset
+            self.val_dataset = self._val_dataset
+        elif phase == "test":
+            if args.VALIDATION:
+                split = 'val'
+            else:
+                split = 'test'
+            self._test_dataset = self.Dataset(condition_length=self.condition_length,
                                             include_global=False,
-                                            split='val', **self.dataset_args)
-        elif args.VALIDATION:
-            self._val_dataset = self.Dataset(condition_length=self.condition_length,
-                                            include_global=False,
-                                            split='val', **self.dataset_args)
+                                            split=split, **self.dataset_args)
+            self.test_dataset = self._test_dataset
         else:
-            self._val_dataset = self._sample_set
-
-        self.train_dataset = self._train_dataset
-        self.val_dataset = self._val_dataset
+            raise ValueError("Phase should be either train, val or test")
         self.njoints = 18 if args.DATASET.kp18_format else 17
         self.nfeats = self.njoints * args.DATASET.num_coords
         

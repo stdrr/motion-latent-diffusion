@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+from natsort import natsorted
 
 import numpy as np
 import pytorch_lightning as pl
@@ -103,47 +104,55 @@ def main():
         callbacks=callbacks,
     )
 
-    # loading state dict
-    logger.info("Loading checkpoints from {}".format(cfg.TEST.CHECKPOINTS))
+    if os.path.isdir(cfg.TEST.CHECKPOINTS):
+        checkpoints = natsorted(
+            [os.path.join(cfg.TEST.CHECKPOINTS, x) for x in os.listdir(
+                cfg.TEST.CHECKPOINTS) if x.endswith(".ckpt")])
+    else:
+        checkpoints = [cfg.TEST.CHECKPOINTS]
+    
+    for checkpoint in checkpoints:
+        # loading state dict
+        logger.info("Loading checkpoints from {}".format(checkpoint))
 
-    state_dict = torch.load(cfg.TEST.CHECKPOINTS,
-                            map_location="cpu")["state_dict"]
-    model.load_state_dict(state_dict)
+        state_dict = torch.load(checkpoint,
+                                map_location="cpu")["state_dict"]
+        model.load_state_dict(state_dict)
 
-    all_metrics = {}
-    replication_times = cfg.TEST.REPLICATION_TIMES
-    # calculate metrics
-    for i in range(replication_times):
-        metrics_type = ", ".join(cfg.METRIC.TYPE)
-        logger.info(f"Evaluating {metrics_type} - Replication {i}")
-        metrics = trainer.test(model, datamodule=datasets)[0]
-        if "TM2TMetrics" in metrics_type:
-            # mm meteics
-            logger.info(f"Evaluating MultiModality - Replication {i}")
-            datasets.mm_mode(True)
-            mm_metrics = trainer.test(model, datamodule=datasets)[0]
-            metrics.update(mm_metrics)
-            datasets.mm_mode(False)
-        for key, item in metrics.items():
-            if key not in all_metrics:
-                all_metrics[key] = [item]
-            else:
-                all_metrics[key] += [item]
+        all_metrics = {}
+        replication_times = cfg.TEST.REPLICATION_TIMES
+        # calculate metrics
+        for i in range(replication_times):
+            metrics_type = ", ".join(cfg.METRIC.TYPE)
+            logger.info(f"Evaluating {metrics_type} - Replication {i}")
+            metrics = trainer.test(model, datamodule=datasets)[0]
+            if "TM2TMetrics" in metrics_type:
+                # mm meteics
+                logger.info(f"Evaluating MultiModality - Replication {i}")
+                datasets.mm_mode(True)
+                mm_metrics = trainer.test(model, datamodule=datasets)[0]
+                metrics.update(mm_metrics)
+                datasets.mm_mode(False)
+            for key, item in metrics.items():
+                if key not in all_metrics:
+                    all_metrics[key] = [item]
+                else:
+                    all_metrics[key] += [item]
 
-    # metrics = trainer.validate(model, datamodule=datasets[0])
-    all_metrics_new = {}
-    for key, item in all_metrics.items():
-        mean, conf_interval = get_metric_statistics(np.array(item),
-                                                    replication_times)
-        all_metrics_new[key + "/mean"] = mean
-        all_metrics_new[key + "/conf_interval"] = conf_interval
-    print_table(f"Mean Metrics", all_metrics_new)
-    all_metrics_new.update(all_metrics)
-    # save metrics to file
-    metric_file = output_dir.parent / f"metrics_{cfg.TIME}.json"
-    with open(metric_file, "w", encoding="utf-8") as f:
-        json.dump(all_metrics_new, f, indent=4)
-    logger.info(f"Testing done, the metrics are saved to {str(metric_file)}")
+        # metrics = trainer.validate(model, datamodule=datasets[0])
+        all_metrics_new = {}
+        for key, item in all_metrics.items():
+            mean, conf_interval = get_metric_statistics(np.array(item),
+                                                        replication_times)
+            all_metrics_new[key + "/mean"] = mean
+            all_metrics_new[key + "/conf_interval"] = conf_interval
+        print_table(f"Mean Metrics", all_metrics_new)
+        all_metrics_new.update(all_metrics)
+        # save metrics to file
+        metric_file = output_dir.parent / f"metrics_{cfg.TIME}.json"
+        with open(metric_file, "w", encoding="utf-8") as f:
+            json.dump(all_metrics_new, f, indent=4)
+        logger.info(f"Testing done, the metrics are saved to {str(metric_file)}")
 
 
 if __name__ == "__main__":
