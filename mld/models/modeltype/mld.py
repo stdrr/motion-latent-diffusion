@@ -825,7 +825,7 @@ class MLD(BaseModel):
         return rs_set
 
     def allsplit_step(self, split: str, batch, batch_idx):
-        if split in ["train", "val"]:
+        if split in ["train"]:
             if self.stage == "vae":
                 rs_set = self.train_vae_forward(batch)
                 rs_set["lat_t"] = rs_set["lat_m"]
@@ -853,7 +853,8 @@ class MLD(BaseModel):
                     "Loss is None, this happend with torchmetrics > 0.7")
 
         # Compute the metrics - currently evaluate results from text to motion
-        if split in ["val", "test"]:
+        if False:
+        # if split in ["val", "test"]:
             if self.condition in ['text', 'text_uncond']:
                 # use t2m evaluators
                 rs_set = self.t2m_eval(batch)
@@ -947,7 +948,8 @@ class MLD(BaseModel):
                     gt_data = reshape_for_val(batch['motion'])
                     model_output = reshape_for_val(fut_poses)
                 else:
-                    model_output = rs_set["gen_joints_rst"] if self.stage == "vae_diffusion" else rs_set["joints_rst"]
+                    rs_set = self.test_diffusion_forward(batch, finetune_decoder=True) if 'diffusion' in self.stage else self.train_vae_forward(batch) 
+                    model_output = rs_set["joints_rst"]
                     model_output = reshape_for_val(model_output)
                     gt_data = reshape_for_val(batch['motion'])
             elif self.eval_type == 'latent':
@@ -957,11 +959,12 @@ class MLD(BaseModel):
                         h = self.test_diffusion_forward(batch, finetune_decoder=True)["lat_t"]
                         gen_latents.append(h)
                     gen_latents = torch.mean(torch.stack(gen_latents, dim=0), 0)
-                    gt_data = rs_set["lat_m"]
+                    gt_data = self.vae.encode(batch['motion'], batch['length'])[0].permute(1, 0, 2)
                     model_output = gen_latents.clone()
-                else:                    
-                    model_output = rs_set["lat_m"]
-                    gt_data = rs_set["lat_t"]
+                else:
+                    rs_set = self.test_diffusion_forward(batch, finetune_decoder=True)
+                    model_output = rs_set["lat_t"]
+                    gt_data = self.vae.encode(batch['motion'], batch['length'])[0].permute(1, 0, 2)
             transformation_idx = coskad_input[1]
             metadata = coskad_input[2]
             actual_frames = coskad_input[3][:,self.cfg.DATASET.condition_len:]
@@ -1018,7 +1021,7 @@ class MLD(BaseModel):
                 scene_idx, clip_idx = scene_clips[idx]
                 
 
-                gt = np.load(os.path.join(self.cfg.DATASET.UBNORMAL.GT_PATH, all_gts[idx])) 
+                gt = np.load(os.path.join(gt_path, all_gts[idx])) 
                 
                 n_frames = gt.shape[0]
                 
