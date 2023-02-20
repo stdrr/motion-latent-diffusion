@@ -1,0 +1,150 @@
+####################################
+# The following are general settings
+####################################
+
+# Experiment name, more details in Section 'Experiment Name Explanation'
+NAME: diffusion_session_6
+# Debug mode. Set to True will enter the debug mode, then the program will
+# 1. use a tiny dataset for trianing and evaluation
+# 2. validate more intensively
+# 3. will not use `wandb logger`
+DEBUG: false
+# Devices. Optional: “cpu”, “gpu”
+ACCELERATOR: 'gpu'
+# Index of GPUs eg. [0] or [0,1,2,3]
+DEVICE: [0,]
+EXP_DIR: ./checkpoints
+VALIDATION: False
+num_sanity_val_steps: -1 # -1 all, 0 None, else #Batches
+
+#####################################
+# The following are training settings
+#####################################
+TRAIN:
+  # Model stage. Optional: "vae", "diffusion"
+  STAGE: vae_diffusion
+  # Training dataset name
+  DATASETS: ['ubnormal']
+  # Number of dataloader workers
+  NUM_WORKERS: 8
+  # Size of batches
+  BATCH_SIZE: 2048
+  # Total epochs for training
+  END_EPOCH: 50
+
+  RESUME: '' # Resume training from this path
+  PRETRAINED_VAE: null # vae model path
+  PRETRAINED_ENC: './experiments/mld/sts_session_1/checkpoints/epoch=49.ckpt' # condition encoder path
+  OPTIM:
+    TYPE: AdamW # Optimizer type
+    LR: 1e-4 # Learning rate
+  # Ablation study configurations.
+  ABLATION:
+    SKIP_CONNECT: True
+    PE_TYPE: mld
+    DIFF_PE_TYPE: mld
+    BATCH_FIRST: False # batch is the first dimension
+
+#####################################
+# The following are validation settings
+#####################################
+EVAL:
+  DATASETS: ['ubnormal'] # Evaluating datasets
+  BATCH_SIZE: 1024 # Evaluating Batch size
+  SPLIT: test
+  type: latent # motion or latent
+  num_repetition: 5
+#####################################
+# The following are testing settings
+#####################################
+TEST:
+  CHECKPOINTS: ./models/mld_ubnormal_checkpoint/1222_mld_ubnormal_FID041.ckpt # Pretrained model path
+  DATASETS: ['ubnormal'] # training datasets
+  SPLIT: test
+  BATCH_SIZE: 1 # training Batch size
+  MEAN: False
+  NUM_SAMPLES: 1
+  FACT: 1
+
+#####################################
+# The following are basic datasets settings
+#####################################
+DATASET:
+  JOINT_TYPE: 'xyz' # join type
+  # custom args from COSKAD
+  num_coords: 2
+  headless: False
+  seg_len: 12
+  num_transform: 5
+  sub_mean: False
+  symm_range: True
+  vid_res: [1080,720]
+  normalize_pose: True
+  kp18_format: False
+  batch_size: 1024
+  hip_center: False
+  normalization_strategy: 'robust' # use 'none' to avoid normalization, 'robust' otherwise
+  use_fitted_scaler: False
+  kp_th: 0
+  seg_th: 0
+  double_item: False
+  condition_len: 6
+
+#####################################
+# The following are metric settings
+#####################################
+METRIC:
+  TYPE: []
+
+#####################################
+# The following are training losses settings
+#####################################
+LOSS:
+  TYPE: mld # Losses type
+  LAMBDA_LATENT: 1.0e-5 # Lambda for latent Losses
+  LAMBDA_KL: 1.0e-4 # Lambda for kl Losses
+  LAMBDA_REC: 0.0 # Lambda for reconstruction Losses
+  LAMBDA_JOINT: 1.0 # Lambda for joint losses
+  LAMBDA_GEN: 0.0 # Lambda for text-motion generation losses
+  LAMBDA_CROSS: 0.0 # Lambda for reconstruction Losses
+  LAMBDA_CYCLE: 0.0 # Lambda for cycle Losses
+  LAMBDA_PRIOR: 0.0
+  LAMBDA_DECODER: 1.0 # Lambda for reconstruction loss from motion condition encoder
+  DIST_SYNC_ON_STEP: False # Sync Losses on step when distributed trained
+
+#####################################
+# The following are basic model settings
+#####################################
+model:
+  target: modules_coskad
+  vae: true # whether vae model
+  vae_type: sts
+  model_type: mld # model type
+  condition: 'motion_sts' # 'motion_sts'
+  same_vae: False
+  latent_dim: [1, 16] # latent dimension
+  ff_size: 256 # understand what's this
+  num_layers: 4 # number of layers
+  num_head: 3 # number of head layers
+  droupout: 0.1 # dropout rate
+  activation: gelu # activation type
+  guidance_scale: 1.0 #
+  guidance_uncondp: 0.1 # 0.1 0.25
+  sts_hdim: 64
+  pad_size: -1
+  smoothing: 50
+
+#####################################
+# The following are loggers settings
+#####################################
+LOGGER:
+  SACE_CHECKPOINT_EPOCH: 5
+  LOG_EVERY_STEPS: 1
+  VAL_EVERY_STEPS: 51
+  TENSORBOARD: False
+  WANDB:
+    ENTITY: pinlab-sapienza
+    PROJECT: ~ # coskad # comment for debug
+    GROUP: mld_stdrr
+    OFFLINE: False
+    RESUME_ID: null

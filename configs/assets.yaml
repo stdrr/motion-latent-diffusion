@@ -21,6 +21,10 @@ DATASET:
     SPLIT_ROOT: ./datasets/uestc
   AMASS:
     DB_ROOT: /apdcephfs/share_1227775/shingxchen/uicap/data/vibe_db
+  UBNORMAL:
+    ROOT: ./datasets/UBnormal
+    GT_PATH: ./datasets/UBnormal/testing/test_frame_mask
+    GT_PATH_VAL: ./datasets/UBnormal/validating/test_frame_mask
 
 model:
   bert_path: './deps/distilbert-base-uncased' # bert model path for all text encoders
