@@ -21,21 +21,28 @@ class PoseDatasetForDiffusion(PoseDatasetMorais):
         super().__init__(**kwargs)
         assert self.condition_length < self.seg_len, "condition length should be smaller than segment length"
         self.n_frames = self.seg_len - self.condition_length
+        self.inpainting = kwargs.get('inpainting', False)
 
 
     def __getitem__(self, index):
         item = super().__getitem__(index)
         item_dict = dict()
-        if self.condition_length > 0:
-            item_dict['motion'] = torch.tensor(item[0][:,self.n_frames:]).permute(1,2,0).contiguous().flatten(start_dim=1) # shape T,V,C
-            item_dict['motion_cond'] = torch.tensor(item[0][:,:self.n_frames]).permute(1,2,0).contiguous().flatten(start_dim=1)
+        if self.inpainting:
+            cond_index = self.condition_length // 2
+            item_dict['motion'] = torch.tensor(item[0][:,cond_index:-cond_index]).permute(1,2,0).contiguous().flatten(start_dim=1) # shape T,V,C
+            index_list = np.arange(cond_index)
+            index_list = np.concatenate([index_list, np.arange(-cond_index, 0)])
+            item_dict['motion_cond'] = torch.tensor(item[0][:,index_list]).permute(1,2,0).contiguous().flatten(start_dim=1)
         else:
-            item_dict['motion'] = torch.tensor(item[0]).permute(1,2,0).contiguous().flatten(start_dim=1) # shape T,V,C
-            item_dict['motion_cond'] = item_dict['motion']
+            if self.condition_length > 0:
+                item_dict['motion'] = torch.tensor(item[0][:,self.n_frames:]).permute(1,2,0).contiguous().flatten(start_dim=1) # shape T,V,C
+                item_dict['motion_cond'] = torch.tensor(item[0][:,:self.n_frames]).permute(1,2,0).contiguous().flatten(start_dim=1)
+            else:
+                item_dict['motion'] = torch.tensor(item[0]).permute(1,2,0).contiguous().flatten(start_dim=1) # shape T,V,C
+                item_dict['motion_cond'] = item_dict['motion']
         item_dict['length'] = self.n_frames
         item_dict['coskad_input'] = item
         item_dict['text'] = '' # for compatibility
-        # item_dict.update({f'metadata_{i}':m for i,m in enumerate(item[1:])})
         return item_dict
     
 
@@ -74,7 +81,7 @@ class UBnormal(BASEDataModule):
                             'return_indices': False, 'return_metadata': True, 'return_mean': args.DATASET.sub_mean,
                             'symm_range': args.DATASET.symm_range, 'hip_center': args.DATASET.hip_center, 
                             'normalization_strategy': args.DATASET.normalization_strategy, 'ckpt': args.EXP_DIR, 'scaler': scaler, 
-                            'kp_threshold':args.DATASET.kp_th, 'double_item': args.DATASET.double_item}
+                            'kp_threshold':args.DATASET.kp_th, 'double_item': args.DATASET.double_item, 'inpainting': args.DATASET.inpainting}
         if phase == "train":
             if args.DEBUG:
                 self._sample_set = self.get_sample_set(overrides=self.dataset_args)

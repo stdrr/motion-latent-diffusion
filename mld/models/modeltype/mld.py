@@ -1018,7 +1018,7 @@ class MLD(BaseModel):
                 scene_idx, clip_idx = scene_clips[idx]
                 
 
-                gt = np.load(os.path.join(self.cfg.DATASET.UBNORMAL.GT_PATH, all_gts[idx])) 
+                gt = np.load(os.path.join(gt_path, all_gts[idx])) 
                 
                 n_frames = gt.shape[0]
                 

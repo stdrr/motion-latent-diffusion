@@ -14,15 +14,15 @@ ACCELERATOR: 'gpu'
 # Index of GPUs eg. [0] or [0,1,2,3]
 DEVICE: [0,]
 EXP_DIR: ./checkpoints
-VALIDATION: False
-num_sanity_val_steps: -1 # -1 all, 0 None, else #Batches
+VALIDATION: True
+num_sanity_val_steps: 0 # -1 all, 0 None, else #Batches
 
 #####################################
 # The following are training settings
 #####################################
 TRAIN:
   # Model stage. Optional: "vae", "diffusion"
-  STAGE: vae_diffusion
+  STAGE: diffusion
   # Training dataset name
   DATASETS: ['ubnormal']
   # Number of dataloader workers
@@ -33,7 +33,7 @@ TRAIN:
   END_EPOCH: 50
 
   RESUME: '' # Resume training from this path
-  PRETRAINED_VAE: null # vae model path
+  PRETRAINED_VAE: './experiments/mld/sts_session_1/checkpoints/epoch=49.ckpt' # vae model path
   PRETRAINED_ENC: './experiments/mld/sts_session_1/checkpoints/epoch=49.ckpt' # condition encoder path
   OPTIM:
     TYPE: AdamW # Optimizer type
@@ -89,6 +89,7 @@ DATASET:
   seg_th: 0
   double_item: False
   condition_len: 6
+  inpainting: True
 
 #####################################
 # The following are metric settings
@@ -140,11 +141,11 @@ model:
 LOGGER:
   SACE_CHECKPOINT_EPOCH: 5
   LOG_EVERY_STEPS: 1
-  VAL_EVERY_STEPS: 51
+  VAL_EVERY_STEPS: 1
   TENSORBOARD: False
   WANDB:
     ENTITY: pinlab-sapienza
-    PROJECT: ~ # coskad # comment for debug
+    PROJECT: coskad # comment for debug
     GROUP: mld_stdrr
     OFFLINE: False
     RESUME_ID: null
