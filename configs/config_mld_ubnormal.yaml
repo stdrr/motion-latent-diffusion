@@ -53,7 +53,7 @@ EVAL:
   BATCH_SIZE: 1024 # Evaluating Batch size
   SPLIT: test
   type: latent # motion or latent
-
+  num_repetition: 5
 #####################################
 # The following are testing settings
 #####################################
