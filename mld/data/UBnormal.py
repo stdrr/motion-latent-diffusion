@@ -9,7 +9,7 @@ from .base import BASEDataModule
 # From COSKAD
 import pickle
 import sys
-sys.path.append('/media/odin/stdrr/projects/anomaly_detection/code/COSKAD/clean_code/HRAD_lightning')
+sys.path.append('/media/odin/stdrr/projects/anomaly_detection/code/HRAD_lightning')
 from utils.dataset import PoseDatasetMorais
 from utils.dataset_utils import ae_trans_list
 
@@ -37,6 +37,9 @@ class PoseDatasetForDiffusion(PoseDatasetMorais):
             if self.condition_length > 0:
                 item_dict['motion'] = torch.tensor(item[0][:,self.n_frames:]).permute(1,2,0).contiguous().flatten(start_dim=1) # shape T,V,C
                 item_dict['motion_cond'] = torch.tensor(item[0][:,:self.n_frames]).permute(1,2,0).contiguous().flatten(start_dim=1)
+            elif self.condition_length < 0:
+                item_dict['motion'] = torch.tensor(item[0]).permute(1,2,0).contiguous().flatten(start_dim=1)
+                item_dict['motion_cond'] = torch.tensor(item[0][:,:(-self.condition_length)]).permute(1,2,0).contiguous().flatten(start_dim=1)
             else:
                 item_dict['motion'] = torch.tensor(item[0]).permute(1,2,0).contiguous().flatten(start_dim=1) # shape T,V,C
                 item_dict['motion_cond'] = item_dict['motion']

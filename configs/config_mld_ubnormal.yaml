@@ -3,7 +3,7 @@
 ####################################
 
 # Experiment name, more details in Section 'Experiment Name Explanation'
-NAME: diffusion_session_6
+NAME: 12_vae_diffusion_tinySTS_same_tinyDenoiser_l32_cond6_ngen5_motion
 # Debug mode. Set to True will enter the debug mode, then the program will
 # 1. use a tiny dataset for trianing and evaluation
 # 2. validate more intensively
@@ -14,7 +14,7 @@ ACCELERATOR: 'gpu'
 # Index of GPUs eg. [0] or [0,1,2,3]
 DEVICE: [0,]
 EXP_DIR: ./checkpoints
-VALIDATION: True
+VALIDATION: true
 num_sanity_val_steps: 0 # -1 all, 0 None, else #Batches
 
 #####################################
@@ -22,19 +22,19 @@ num_sanity_val_steps: 0 # -1 all, 0 None, else #Batches
 #####################################
 TRAIN:
   # Model stage. Optional: "vae", "diffusion"
-  STAGE: diffusion
+  STAGE: vae_diffusion
   # Training dataset name
   DATASETS: ['ubnormal']
   # Number of dataloader workers
-  NUM_WORKERS: 8
+  NUM_WORKERS: 12
   # Size of batches
   BATCH_SIZE: 2048
   # Total epochs for training
   END_EPOCH: 50
 
   RESUME: '' # Resume training from this path
-  PRETRAINED_VAE: './experiments/mld/sts_session_1/checkpoints/epoch=49.ckpt' # vae model path
-  PRETRAINED_ENC: './experiments/mld/sts_session_1/checkpoints/epoch=49.ckpt' # condition encoder path
+  PRETRAINED_VAE: null # vae model path
+  PRETRAINED_ENC: null # condition encoder path
   OPTIM:
     TYPE: AdamW # Optimizer type
     LR: 1e-4 # Learning rate
@@ -52,7 +52,7 @@ EVAL:
   DATASETS: ['ubnormal'] # Evaluating datasets
   BATCH_SIZE: 1024 # Evaluating Batch size
   SPLIT: test
-  type: latent # motion or latent
+  type: motion # motion or latent
   num_repetition: 5
 #####################################
 # The following are testing settings
@@ -89,7 +89,7 @@ DATASET:
   seg_th: 0
   double_item: False
   condition_len: 6
-  inpainting: True
+  inpainting: False
 
 #####################################
 # The following are metric settings
@@ -110,7 +110,7 @@ LOSS:
   LAMBDA_CROSS: 0.0 # Lambda for reconstruction Losses
   LAMBDA_CYCLE: 0.0 # Lambda for cycle Losses
   LAMBDA_PRIOR: 0.0
-  LAMBDA_DECODER: 1.0 # Lambda for reconstruction loss from motion condition encoder
+  LAMBDA_DECODER: 0.0 # Lambda for reconstruction loss from motion condition encoder
   DIST_SYNC_ON_STEP: False # Sync Losses on step when distributed trained
 
 #####################################
@@ -122,12 +122,12 @@ model:
   vae_type: sts
   model_type: mld # model type
   condition: 'motion_sts' # 'motion_sts'
-  same_vae: False
-  latent_dim: [1, 16] # latent dimension
-  ff_size: 256 # understand what's this
-  num_layers: 4 # number of layers
-  num_head: 3 # number of head layers
-  droupout: 0.1 # dropout rate
+  same_vae: true
+  latent_dim: [1, 32] # latent dimension
+  ff_size: 64 # understand what's this
+  num_layers: 3 # number of layers
+  num_head: 1 # number of head layers
+  droupout: 0.0 # dropout rate
   activation: gelu # activation type
   guidance_scale: 1.0 #
   guidance_uncondp: 0.1 # 0.1 0.25
@@ -141,7 +141,7 @@ model:
 LOGGER:
   SACE_CHECKPOINT_EPOCH: 5
   LOG_EVERY_STEPS: 1
-  VAL_EVERY_STEPS: 1
+  VAL_EVERY_STEPS: 2
   TENSORBOARD: False
   WANDB:
     ENTITY: pinlab-sapienza

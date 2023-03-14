@@ -8,16 +8,26 @@ class Decoder(nn.Module):
         
         self.model = nn.ModuleList()
 
-        self.model.append(stsgcn.ST_GCNN_layer(h_dim,128,[1,1],1,n_frames,
+        self.model.append(stsgcn.ST_GCNN_layer(h_dim,32,[1,1],1,n_frames,
                                            n_joints,dropout))
-        self.model.append(stsgcn.ST_GCNN_layer(128,64,[1,1],1,n_frames,
+        self.model.append(stsgcn.ST_GCNN_layer(32,16,[1,1],1,n_frames,
                                                n_joints,dropout))
             
-        self.model.append(stsgcn.ST_GCNN_layer(64,128,[1,1],1,n_frames,
-                                               n_joints,dropout))
+        # self.model.append(stsgcn.ST_GCNN_layer(64,128,[1,1],1,n_frames,
+        #                                        n_joints,dropout))
                                                
-        self.model.append(stsgcn.ST_GCNN_layer(128,c_out,[1,1],1,n_frames,
+        self.model.append(stsgcn.ST_GCNN_layer(16,c_out,[1,1],1,n_frames,
                                                n_joints,dropout))  
+        # self.model.append(stsgcn.ST_GCNN_layer(h_dim,128,[1,1],1,n_frames,
+        #                                    n_joints,dropout))
+        # self.model.append(stsgcn.ST_GCNN_layer(128,64,[1,1],1,n_frames,
+        #                                        n_joints,dropout))
+            
+        # self.model.append(stsgcn.ST_GCNN_layer(64,128,[1,1],1,n_frames,
+        #                                        n_joints,dropout))
+                                               
+        # self.model.append(stsgcn.ST_GCNN_layer(128,c_out,[1,1],1,n_frames,
+        #                                        n_joints,dropout))
         
         self.model = nn.Sequential(*self.model)
 
@@ -33,7 +43,7 @@ class STS_Decoder(nn.Module):
     def __init__(self, c_in, h_dim=32, latent_dim=512, n_frames=12, n_joints=18, **kwargs) -> None:
         super(STS_Decoder, self).__init__()
 
-        dropout = kwargs.get('dropout', 0.3)
+        dropout = kwargs.get('dropout', 0.)
         self.h_dim = h_dim
 
         self.decoder = Decoder(c_out=c_in, h_dim=h_dim, n_frames=n_frames, n_joints=n_joints, dropout=dropout)

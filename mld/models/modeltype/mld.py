@@ -27,6 +27,8 @@ from .base import BaseModel
 
 from copy import deepcopy
 import pytorch_lightning as pl
+from glob import glob
+
 
 
 class MLD(BaseModel):
@@ -176,7 +178,7 @@ class MLD(BaseModel):
             #                    latent_dim=self.latent_dim[1],
             #                    n_frames=cfg.DATASET.condition_len,
             #                    n_joints=self.njoints)
-            return STSGCN(cfg) 
+            return STSGCN(cfg, conditioning=True) 
         elif "vae" in self.condition:
             if cfg.model.same_vae:
                 return self.vae
@@ -976,16 +978,11 @@ class MLD(BaseModel):
         return loss
 
 
-    def load_state_dict(self, state_dict, strict=True):
-        # new_state_dict = {}
-        # for k, v in state_dict.items():
-        #     if 'emb_proj' in k:
-        #         new_k = k.split('.')
-        #         new_k = '.'.join(new_k[:2]+[new_k[2]]*2+new_k[3:])
-        #         new_state_dict[new_k] = v
-        #     else:
-        #         new_state_dict[k] = v
-        return pl.LightningModule.load_state_dict(self, state_dict=state_dict, strict=strict)
+    def load_state_dict(self, state_dict, strict=False):
+        if self.cfg.model.same_vae:
+            emb_proj_sd = {k.replace('vae', 'denoiser.emb_proj'):v for k,v in state_dict.items() if 'vae' in k}
+        state_dict.update(emb_proj_sd)
+        pl.LightningModule.load_state_dict(self, state_dict, strict=strict)
 
     
     def validation_epoch_end(self, outputs):
@@ -996,11 +993,26 @@ class MLD(BaseModel):
     def test_epoch_end(self, outputs):
         out, gt_data, trans, meta, frames = light_processing_data(outputs)
         return {'AUC':self.post_processing(out, gt_data, trans, meta, frames, split='test')}
+    
+    def hr_ubnormal(self, path_to_boolean_masks):
+        """
+        """
+        hr_boolean_masks = glob(path_to_boolean_masks)
+        hr_ubnormal_masked_clips = {}
+
+        for boolean_mask_path in hr_boolean_masks:
+            scene_clip_id = os.path.basename(boolean_mask_path).split('.')[0]
+            scene_id, clip_id = list(map(int, scene_clip_id.split('_')))
+            hr_ubnormal_masked_clips[(scene_id, clip_id)] = np.load(boolean_mask_path)
+
+        return hr_ubnormal_masked_clips
 
 
     # from COSKAD
     def post_processing(self, out:np.ndarray, gt_data:np.ndarray, trans:int, meta:np.ndarray, frames:np.ndarray, split='') -> float:
-        gt_path = self.cfg.DATASET.UBNORMAL.GT_PATH if split == 'test' else self.cfg.DATASET.UBNORMAL.GT_PATH_VAL
+        gt_path = self.cfg.DATASET.UBNORMAL.GT_PATH if (split == 'test' and (not self.cfg.VALIDATION)) else self.cfg.DATASET.UBNORMAL.GT_PATH_VAL
+        ubnormal_path_to_boolean_masks = '/media/odin/data_anomaly/anomaly_detection/UBnormal/hr_bool_masks/testing/test_frame_mask/*'
+        hr_ubnormal_masked_clips = self.hr_ubnormal(ubnormal_path_to_boolean_masks)
         all_gts = [file_name for file_name in os.listdir(gt_path) if file_name.endswith('.npy')] # CHANGE CHANGE
         all_gts = sorted(all_gts)
         scene_clips = [(int(fn.split('_')[0]), int(fn.split('_')[1].split('.')[0])) for fn in all_gts]
@@ -1060,6 +1072,9 @@ class MLD(BaseModel):
                 # if clip_idx in masked_clips:
                 #     clip_score = clip_score[np.array(masked_clips[clip_idx])==1]
                 #     gt = gt[np.array(masked_clips[clip_idx])==1]
+                if (scene_idx, clip_idx) in hr_ubnormal_masked_clips:
+                    clip_score = clip_score[hr_ubnormal_masked_clips[(scene_idx, clip_idx)]]
+                    gt = gt[hr_ubnormal_masked_clips[(scene_idx, clip_idx)]]
 
                 clip_score = score_process(clip_score, smoothing=self.smoothing_win, dataname=self.cfg.EVAL.DATASETS[0], use_scaler=False)
                 model_scores.append(clip_score)

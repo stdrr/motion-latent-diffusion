@@ -158,7 +158,8 @@ def main():
         logger=loggers,
         callbacks=callbacks,
         check_val_every_n_epoch=cfg.LOGGER.VAL_EVERY_STEPS,
-        num_sanity_val_steps=cfg.num_sanity_val_steps
+        num_sanity_val_steps=cfg.num_sanity_val_steps,
+        precision='16'
     )
     logger.info("Trainer initialized")
 

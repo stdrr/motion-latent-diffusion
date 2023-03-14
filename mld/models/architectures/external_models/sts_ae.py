@@ -9,13 +9,18 @@ def filter_state_dict(state_dict:dict, prefix=''):
 
 
 class STSGCN(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, conditioning=False):
         super(STSGCN, self).__init__()
 
         self.c_in = cfg.DATASET.num_coords
         self.h_dim = cfg.motion_sts.params.h_dim
         self.latent_dim = cfg.model.latent_dim[-1]
-        self.n_frames = cfg.DATASET.seg_len - cfg.DATASET.condition_len
+        if conditioning:
+            self.n_frames = abs(cfg.DATASET.condition_len)
+        elif cfg.DATASET.condition_len > 0:
+            self.n_frames = cfg.DATASET.seg_len - cfg.DATASET.condition_len
+        else:
+            self.n_frames = cfg.DATASET.seg_len
         self.n_joints = cfg.DATASET.NJOINTS
         self.ckpt = cfg.TRAIN.PRETRAINED_ENC
 
